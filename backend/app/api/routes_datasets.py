@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import List
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -22,8 +22,10 @@ guard = UploadGuard()
 
 
 @datasets_router.post("", response_model=UploadGuardResponse, status_code=status.HTTP_201_CREATED)
+@datasets_router.post("/upload", response_model=UploadGuardResponse, status_code=status.HTTP_201_CREATED)
 async def upload_dataset(
     file: UploadFile = File(...),
+    format: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> UploadGuardResponse:
@@ -123,6 +125,31 @@ async def upload_dataset(
         null_bytes_stripped=guard_report.null_bytes_stripped,
         formula_injection_cells_detected=ingest_res.formula_injection_count,
     )
+
+
+@datasets_router.post("/demo", status_code=status.HTTP_201_CREATED)
+def load_demo_dataset_for_datasets(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Generates and loads the seeded dirty enterprise demo dataset."""
+    from app.api.routes_admin import load_demo_dataset
+    res = load_demo_dataset(current_user=current_user, db=db)
+    dataset = db.query(Dataset).filter(Dataset.id == res["dataset_id"]).first()
+    ds_resp = DatasetResponse(
+        id=dataset.id,
+        owner_id=dataset.owner_id,
+        filename=dataset.original_filename_sanitized,
+        sha256_original=dataset.sha256_original,
+        canonical_hash=dataset.canonical_hash,
+        format=dataset.format,
+        rows=dataset.rows,
+        cols=dataset.cols,
+        size_bytes=dataset.size_bytes,
+        created_at=dataset.created_at.isoformat(),
+        quarantined_count=0,
+    )
+    return {"dataset": ds_resp, **res}
 
 
 @datasets_router.get("", response_model=List[DatasetResponse])

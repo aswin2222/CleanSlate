@@ -66,17 +66,22 @@ _ACTIVE_LEDGERS: Dict[str, TransformationLedger] = {}
 
 
 def _get_or_load_df(run: Run, dataset: Dataset) -> pd.DataFrame:
-    """Retrieves current working DataFrame for run, or loads and decrypts from storage."""
+    """Retrieves current working DataFrame for run, or loads and decrypts from storage or Cloudinary."""
     if run.id in _ACTIVE_DFS:
         return _ACTIVE_DFS[run.id]
 
-    # Decrypt from storage
+    # Decrypt from storage or fetch from Cloudinary
     enc_path = Path(dataset.stored_path)
-    if not enc_path.exists():
+    if enc_path.exists():
+        enc_bytes = enc_path.read_bytes()
+        raw_bytes = encryptor.decrypt_bytes(enc_bytes)
+    elif getattr(dataset, "cloudinary_url", None):
+        import urllib.request
+        with urllib.request.urlopen(dataset.cloudinary_url, timeout=20) as resp:
+            raw_bytes = resp.read()
+    else:
         raise HTTPException(status_code=404, detail="Dataset storage file not found")
 
-    enc_bytes = enc_path.read_bytes()
-    raw_bytes = encryptor.decrypt_bytes(enc_bytes)
     res = read_dataset_file(raw_bytes, dataset.original_filename_sanitized)
     _ACTIVE_DFS[run.id] = res.df
     return res.df
@@ -86,6 +91,197 @@ def _get_ledger(run_id: str) -> TransformationLedger:
     if run_id not in _ACTIVE_LEDGERS:
         _ACTIVE_LEDGERS[run_id] = TransformationLedger(run_id=run_id)
     return _ACTIVE_LEDGERS[run_id]
+
+
+def _get_or_create_active_run(dataset: Dataset, db: Session, llm_mode: str = "heuristic") -> Run:
+    """Returns the most recent Run for dataset, or creates a new one if absent."""
+    run = db.query(Run).filter(Run.dataset_id == dataset.id).order_by(Run.created_at.desc()).first()
+    if not run:
+        run = Run(
+            dataset_id=dataset.id,
+            status="created",
+            llm_mode=llm_mode,
+            config_json="{}",
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+    return run
+
+
+@runs_router.get("/datasets/{dataset_id}/runs", response_model=List[RunResponse])
+def get_dataset_runs(
+    dataset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[RunResponse]:
+    """Retrieves all pipeline runs for a dataset."""
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.owner_id == current_user.id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    runs = db.query(Run).filter(Run.dataset_id == dataset.id).order_by(Run.created_at.desc()).all()
+    if not runs:
+        initial_run = _get_or_create_active_run(dataset, db)
+        runs = [initial_run]
+
+    return [
+        RunResponse(
+            id=run.id,
+            dataset_id=run.dataset_id,
+            status=run.status,
+            llm_mode=run.llm_mode,
+            config_json=run.config_json or "{}",
+            created_at=run.created_at.isoformat() if run.created_at else "",
+            updated_at=run.updated_at.isoformat() if run.updated_at else "",
+        )
+        for run in runs
+    ]
+
+
+@runs_router.get("/datasets/{dataset_id}/profile")
+@runs_router.post("/datasets/{dataset_id}/profile")
+def get_or_run_dataset_profile(
+    dataset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Retrieves or automatically computes profile for dataset."""
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.owner_id == current_user.id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    run = _get_or_create_active_run(dataset, db)
+    prof_record = db.query(Profile).filter(Profile.run_id == run.id).first()
+    if prof_record:
+        try:
+            return json.loads(prof_record.profile_json)
+        except Exception:
+            pass
+
+    df = _get_or_load_df(run, dataset)
+    profile = profile_dataset(df)
+    prof_dict = profile.to_dict()
+    prof_json = json.dumps(prof_dict)
+
+    if prof_record:
+        prof_record.profile_json = prof_json
+        prof_record.fingerprint = profile.fingerprint
+    else:
+        db.add(Profile(run_id=run.id, profile_json=prof_json, fingerprint=profile.fingerprint))
+
+    run.status = "profiled"
+    db.commit()
+    return prof_dict
+
+
+@runs_router.get("/datasets/{dataset_id}/rules")
+def get_dataset_rules(
+    dataset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Retrieves inferred rules for dataset, auto-inferring if not yet done."""
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.owner_id == current_user.id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    run = _get_or_create_active_run(dataset, db)
+    rule_models = db.query(RuleModel).filter(RuleModel.run_id == run.id).all()
+    if not rule_models:
+        df = _get_or_load_df(run, dataset)
+        prof_record = db.query(Profile).filter(Profile.run_id == run.id).first()
+        if prof_record:
+            prof = profile_dataset(df)
+        else:
+            prof = profile_dataset(df)
+            db.add(Profile(run_id=run.id, profile_json=json.dumps(prof.to_dict()), fingerprint=prof.fingerprint))
+            db.commit()
+
+        _, rules = run_semantic_inference(prof, df)
+        for r in rules:
+            rm = RuleModel(
+                id=r.id,
+                run_id=run.id,
+                kind=r.kind.value,
+                columns_json=json.dumps(r.columns),
+                params_json=json.dumps(r.params),
+                support=r.support,
+                confidence=r.confidence,
+                source=r.source.value,
+                status=r.status.value,
+                evidence=r.evidence,
+            )
+            db.add(rm)
+        run.status = "inferred"
+        db.commit()
+        rule_models = db.query(RuleModel).filter(RuleModel.run_id == run.id).all()
+
+    resp = []
+    for rm in rule_models:
+        resp.append({
+            "id": rm.id,
+            "kind": rm.kind,
+            "columns": json.loads(rm.columns_json),
+            "params": json.loads(rm.params_json),
+            "support": rm.support,
+            "confidence": rm.confidence,
+            "source": rm.source,
+            "status": rm.status,
+            "evidence": rm.evidence,
+        })
+    return resp
+
+
+@runs_router.post("/datasets/{dataset_id}/infer")
+def infer_dataset_rules(
+    dataset_id: str,
+    req: Dict[str, Any] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Infers semantic rules for dataset."""
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.owner_id == current_user.id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    run = _get_or_create_active_run(dataset, db)
+    df = _get_or_load_df(run, dataset)
+    prof = profile_dataset(df)
+
+    existing_prof = db.query(Profile).filter(Profile.run_id == run.id).first()
+    if existing_prof:
+        existing_prof.profile_json = json.dumps(prof.to_dict())
+        existing_prof.fingerprint = prof.fingerprint
+    else:
+        db.add(Profile(run_id=run.id, profile_json=json.dumps(prof.to_dict()), fingerprint=prof.fingerprint))
+
+    semantics, rules = run_semantic_inference(prof, df)
+    db.query(RuleModel).filter(RuleModel.run_id == run.id).delete()
+    for r in rules:
+        rm = RuleModel(
+            id=r.id,
+            run_id=run.id,
+            kind=r.kind.value,
+            columns_json=json.dumps(r.columns),
+            params_json=json.dumps(r.params),
+            support=r.support,
+            confidence=r.confidence,
+            source=r.source.value,
+            status=r.status.value,
+            evidence=r.evidence,
+        )
+        db.add(rm)
+
+    run.status = "inferred"
+    db.commit()
+
+    return {
+        "column_semantics": semantics,
+        "inferred_count": len(rules),
+        "rules_count": len(rules),
+        "rules": [r.to_dict() for r in rules],
+    }
 
 
 @runs_router.post("/datasets/{dataset_id}/runs", response_model=RunResponse, status_code=status.HTTP_201_CREATED)
@@ -383,6 +579,12 @@ def get_plan(
 ) -> Dict[str, Any]:
     """Retrieves plan steps and compound cumulative loss."""
     steps = db.query(PlanStepModel).join(Run).join(Dataset).filter(PlanStepModel.run_id == run_id, Dataset.owner_id == current_user.id).order_by(PlanStepModel.seq).all()
+    if not steps:
+        try:
+            return generate_plan(run_id, current_user, db)
+        except Exception:
+            pass
+
     resp_steps = []
     for s in steps:
         resp_steps.append({
@@ -723,6 +925,56 @@ def run_tests(
     return report.to_dict()
 
 
+@runs_router.post("/runs/{run_id}/verify")
+def verify_run(
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Runs pre- and post-cleaning test suite evaluation and outputs Pandera schema code."""
+    run = db.query(Run).join(Dataset).filter(Run.id == run_id, Dataset.owner_id == current_user.id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    df = _get_or_load_df(run, run.dataset)
+    rule_models = db.query(RuleModel).filter(RuleModel.run_id == run.id).all()
+    domain_rules = [
+        Rule(
+            id=rm.id,
+            kind=RuleKind(rm.kind),
+            columns=json.loads(rm.columns_json),
+            params=json.loads(rm.params_json),
+            support=rm.support,
+            confidence=rm.confidence,
+            evidence=rm.evidence,
+            source=RuleSource(rm.source),
+            status=RuleStatus(rm.status),
+        )
+        for rm in rule_models
+    ]
+
+    runner = TestRunner()
+    post_report = runner.evaluate_rules_on_frame(df, domain_rules, stage="post")
+    pre_report = runner.evaluate_rules_on_frame(df, domain_rules, stage="pre")
+
+    test_code = "# Auto-generated Pandera Schema & Tests\nimport pandera as pa\nfrom pandera import Column, Check, DataFrameSchema\n\n"
+    try:
+        generator = TestGenerator()
+        suite_dir = generator.generate_suite(run.id, df, domain_rules, [])
+        pandera_file = suite_dir / "test_pandera_schema.py"
+        if pandera_file.exists():
+            test_code = pandera_file.read_text(encoding="utf-8")
+    except Exception:
+        pass
+
+    return {
+        "pre_report": pre_report.to_dict(),
+        "post_report": post_report.to_dict(),
+        "test_code": test_code,
+    }
+
+
+@runs_router.post("/runs/{run_id}/mutation-test")
 @runs_router.post("/runs/{run_id}/tests/mutation-check")
 def run_mutation_check(
     run_id: str,

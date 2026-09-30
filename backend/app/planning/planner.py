@@ -196,6 +196,17 @@ class TransformationPlanner:
                 if step.predicted_loss.cells_modified > 0:
                     proposed_steps.append(step)
 
+        # Baseline fallback: if no steps qualified, add safe cleaning steps
+        if not proposed_steps and data_cols:
+            str_cols = [c for c in data_cols if df[c].dtype == object or str(df[c].dtype) == "string"]
+            if str_cols:
+                t = registry.get("trim_whitespace")
+                if t:
+                    proposed_steps.append(t.plan(df, {"columns": str_cols}))
+            t_dedupe = registry.get("dedupe_exact")
+            if t_dedupe:
+                proposed_steps.append(t_dedupe.plan(df, {}))
+
         # 8. Dependency sort according to TRANSFORMATION_EXECUTION_ORDER
         def order_key(step: PlanStep) -> int:
             try:

@@ -6,6 +6,30 @@ from pathlib import Path
 from typing import List
 
 
+def _load_env() -> None:
+    possible_paths = [
+        Path(__file__).resolve().parent.parent.parent / ".env",
+        Path(".env"),
+    ]
+    for p in possible_paths:
+        if p.is_file():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k not in os.environ:
+                                os.environ[k] = v
+                break
+            except Exception:
+                pass
+
+_load_env()
+
+
 class Settings:
     def __init__(self) -> None:
         self.PROJECT_NAME: str = os.getenv("PROJECT_NAME", "CleanSlate")
@@ -31,10 +55,12 @@ class Settings:
 
         # LLM Settings
         self.LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "none")
-        self.LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
+        default_base_url = "https://api.groq.com/openai/v1" if self.LLM_PROVIDER == "groq" else ""
+        self.LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", default_base_url) or default_base_url
         self.LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-        self.LLM_MODEL: str = os.getenv("LLM_MODEL", "heuristic")
-        self.LLM_TIMEOUT_S: int = int(os.getenv("LLM_TIMEOUT_S", "15"))
+        default_model = "openai/gpt-oss-120b" if self.LLM_PROVIDER == "groq" else "heuristic"
+        self.LLM_MODEL: str = os.getenv("LLM_MODEL", default_model)
+        self.LLM_TIMEOUT_S: int = int(os.getenv("LLM_TIMEOUT_S", "30"))
 
         # Storage & Upload Guardrails
         self.STORAGE_DIR: str = os.getenv("STORAGE_DIR", "./storage")

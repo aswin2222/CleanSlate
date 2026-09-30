@@ -27,6 +27,11 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
+# Environments and secrets
+.env
+.env.local
+*.env
+
 .venv/
 venv/
 ENV/

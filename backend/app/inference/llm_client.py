@@ -42,15 +42,27 @@ class LLMClient:
     """
 
     def __init__(self) -> None:
-        self.provider = settings.LLM_PROVIDER
-        self.base_url = settings.LLM_BASE_URL.rstrip("/") if settings.LLM_BASE_URL else ""
-        self.api_key = settings.LLM_API_KEY
-        self.model = settings.LLM_MODEL
-        self.timeout_s = settings.LLM_TIMEOUT_S
+        self.reload_config()
         self._cache: Dict[str, LLMSuggestionResponse] = {}
 
+    def reload_config(self) -> None:
+        self.provider = settings.LLM_PROVIDER
+        base_url = settings.LLM_BASE_URL.rstrip("/") if settings.LLM_BASE_URL else ""
+        if (self.provider == "groq" or (settings.LLM_API_KEY and settings.LLM_API_KEY.startswith("gsk_"))) and not base_url:
+            base_url = "https://api.groq.com/openai/v1"
+        self.base_url = base_url
+        self.api_key = settings.LLM_API_KEY
+        default_model = "openai/gpt-oss-120b" if self.provider == "groq" else "gpt-4o-mini"
+        self.model = settings.LLM_MODEL if settings.LLM_MODEL != "heuristic" else default_model
+        self.timeout_s = settings.LLM_TIMEOUT_S
+
     def is_configured(self) -> bool:
-        return self.provider == "openai_compatible" and bool(self.base_url)
+        self.reload_config()
+        return (
+            self.provider in ("openai_compatible", "groq", "openai")
+            and bool(self.base_url)
+            and bool(self.api_key)
+        )
 
     def suggest_semantics_and_rules(
         self,

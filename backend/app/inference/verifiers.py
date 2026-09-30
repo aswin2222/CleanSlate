@@ -39,7 +39,46 @@ def verify_candidate(
     violating_rids: List[int] = []
 
     kind = candidate.kind
-    cols = candidate.columns
+    cols = [c for c in candidate.columns if c in df.columns]
+
+    if not cols:
+        return Rule(
+            id=f"rule_{uuid.uuid4().hex[:8]}",
+            kind=kind,
+            columns=candidate.columns,
+            params=candidate.params,
+            support=0.0,
+            confidence=0.0,
+            source=RuleSource.DETERMINISTIC,
+            status=RuleStatus.REJECTED_BY_USER,
+            evidence="Rejected: target columns not found in dataset.",
+        )
+
+    if kind == RuleKind.DATE_ORDER and len(cols) < 2:
+        return Rule(
+            id=f"rule_{uuid.uuid4().hex[:8]}",
+            kind=kind,
+            columns=cols,
+            params=candidate.params,
+            support=0.0,
+            confidence=0.0,
+            source=RuleSource.DETERMINISTIC,
+            status=RuleStatus.REJECTED_BY_USER,
+            evidence="Rejected: DATE_ORDER requires 2 valid columns.",
+        )
+
+    if kind == RuleKind.ARITHMETIC and len(cols) < 3:
+        return Rule(
+            id=f"rule_{uuid.uuid4().hex[:8]}",
+            kind=kind,
+            columns=cols,
+            params=candidate.params,
+            support=0.0,
+            confidence=0.0,
+            source=RuleSource.DETERMINISTIC,
+            status=RuleStatus.REJECTED_BY_USER,
+            evidence="Rejected: ARITHMETIC requires 3 valid columns (target, a, b).",
+        )
 
     # Verify rule kind
     if kind == RuleKind.NOT_NULL:

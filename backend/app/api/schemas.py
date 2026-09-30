@@ -44,6 +44,7 @@ class DatasetResponse(BaseModel):
     size_bytes: int
     created_at: str
     quarantined_count: int = 0
+    cloudinary_url: Optional[str] = ""
 
 
 class UploadGuardResponse(BaseModel):

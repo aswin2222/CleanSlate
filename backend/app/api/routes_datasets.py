@@ -16,6 +16,8 @@ from app.execution.canonical_hash import compute_canonical_hash
 from app.ingestion.readers import read_dataset_file
 from app.security.crypto import encryptor
 from app.security.upload_guard import UploadGuard
+from app.security.cloudinary_service import upload_bytes_to_cloudinary
+from app.db.firebase_sync import sync_dataset_to_firestore, sync_audit_to_firestore
 
 datasets_router = APIRouter(prefix="/datasets", tags=["Datasets"])
 guard = UploadGuard()
@@ -31,7 +33,7 @@ async def upload_dataset(
 ) -> UploadGuardResponse:
     """
     Ingests and securely validates an enterprise dataset file.
-    Runs upload guard, isolates ragged rows to quarantine, encrypts file at rest.
+    Runs upload guard, isolates ragged rows to quarantine, uploads to Cloudinary, encrypts file at rest.
     """
     content = await file.read()
     filename = file.filename or "unnamed_upload.csv"
@@ -59,7 +61,11 @@ async def upload_dataset(
     sha256_orig = hashlib.sha256(content).hexdigest()
     canonical_hash_val = compute_canonical_hash(ingest_res.df)
 
-    # 3. Encrypt and persist file to disk
+    # 3. Upload to Cloudinary (preset: TITAN-project)
+    cloudinary_res = upload_bytes_to_cloudinary(content, filename)
+    cloudinary_url = cloudinary_res.get("secure_url", "")
+
+    # 4. Encrypt and persist file to disk
     encrypted_bytes = encryptor.encrypt_bytes(content)
     storage_filename = f"{guard_report.storage_key}.enc"
     storage_path = settings.storage_path / "datasets"
@@ -67,7 +73,7 @@ async def upload_dataset(
     full_path = storage_path / storage_filename
     full_path.write_bytes(encrypted_bytes)
 
-    # 4. Save Dataset record
+    # 5. Save Dataset record
     dataset = Dataset(
         owner_id=current_user.id,
         original_filename_sanitized=guard_report.sanitized_filename,
@@ -79,11 +85,12 @@ async def upload_dataset(
         cols=len(ingest_res.original_columns),
         size_bytes=guard_report.file_size_bytes,
         encrypted=True,
+        cloudinary_url=cloudinary_url,
     )
     db.add(dataset)
     db.flush()
 
-    # 5. Save quarantine rows
+    # 6. Save quarantine rows
     for q in ingest_res.quarantine:
         q_row = QuarantineRow(
             dataset_id=dataset.id,
@@ -97,7 +104,7 @@ async def upload_dataset(
     audit = AuditEvent(
         actor=current_user.email,
         event="DATASET_INGESTED",
-        details_json=f'{{"dataset_id": "{dataset.id}", "rows": {dataset.rows}, "quarantined": {len(ingest_res.quarantine)}}}',
+        details_json=f'{{"dataset_id": "{dataset.id}", "rows": {dataset.rows}, "quarantined": {len(ingest_res.quarantine)}, "cloudinary_url": "{cloudinary_url}"}}',
     )
     db.add(audit)
     db.commit()
@@ -115,11 +122,33 @@ async def upload_dataset(
         size_bytes=dataset.size_bytes,
         created_at=dataset.created_at.isoformat(),
         quarantined_count=len(ingest_res.quarantine),
+        cloudinary_url=cloudinary_url,
     )
+
+    # Sync to Firebase Firestore asynchronously / best effort
+    try:
+        sync_dataset_to_firestore({
+            "id": dataset.id,
+            "filename": dataset.original_filename_sanitized,
+            "rows": dataset.rows,
+            "cols": dataset.cols,
+            "format": dataset.format,
+            "canonical_hash": dataset.canonical_hash,
+            "cloudinary_url": cloudinary_url,
+            "created_at": dataset.created_at.isoformat(),
+        })
+        sync_audit_to_firestore({
+            "actor": current_user.email,
+            "event": "DATASET_INGESTED",
+            "dataset_id": dataset.id,
+            "timestamp": dataset.created_at.isoformat(),
+        })
+    except Exception:
+        pass
 
     return UploadGuardResponse(
         is_valid=True,
-        message="Dataset accepted and ingested securely",
+        message="Dataset accepted, uploaded to Cloudinary, and ingested securely",
         dataset=ds_resp,
         quarantined_count=len(ingest_res.quarantine),
         null_bytes_stripped=guard_report.null_bytes_stripped,
@@ -174,6 +203,7 @@ def list_datasets(
                 size_bytes=d.size_bytes,
                 created_at=d.created_at.isoformat(),
                 quarantined_count=len(d.quarantine_rows),
+                cloudinary_url=getattr(d, "cloudinary_url", "") or "",
             )
         )
     return resp
@@ -204,6 +234,7 @@ def get_dataset(
         size_bytes=dataset.size_bytes,
         created_at=dataset.created_at.isoformat(),
         quarantined_count=len(dataset.quarantine_rows),
+        cloudinary_url=getattr(dataset, "cloudinary_url", "") or "",
     )
 
 

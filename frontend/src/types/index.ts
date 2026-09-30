@@ -17,6 +17,7 @@ export interface Dataset {
   size_bytes: number;
   created_at: string;
   quarantined_count: number;
+  cloudinary_url?: string;
 }
 
 export interface UploadGuardResponse {

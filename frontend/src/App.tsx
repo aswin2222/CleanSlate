@@ -23,15 +23,11 @@ const ProtectedLayout: React.FC<{
   selectedDataset: Dataset | null;
   datasets: Dataset[];
   onSelectDataset: (d: Dataset) => void;
-  onLoadDemo: () => void;
-  isLoadingDemo: boolean;
 }> = ({
   children,
   selectedDataset,
   datasets,
   onSelectDataset,
-  onLoadDemo,
-  isLoadingDemo,
 }) => {
   const location = useLocation();
   const token = getAuthToken();
@@ -76,8 +72,6 @@ const ProtectedLayout: React.FC<{
           datasets={datasets}
           selectedDataset={selectedDataset}
           onSelectDataset={onSelectDataset}
-          onLoadDemo={onLoadDemo}
-          isLoadingDemo={isLoadingDemo}
         />
         <main className="flex-1 overflow-y-auto p-8">{children}</main>
       </div>
@@ -88,7 +82,6 @@ const ProtectedLayout: React.FC<{
 export const App: React.FC = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [loadingDemo, setLoadingDemo] = useState(false);
 
   const fetchDatasets = async () => {
     try {
@@ -108,19 +101,6 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const handleLoadDemo = async () => {
-    try {
-      setLoadingDemo(true);
-      const res = await apiRequest<{ dataset: Dataset }>('/api/datasets/demo', { method: 'POST' });
-      setSelectedDataset(res.dataset);
-      await fetchDatasets();
-    } catch (err) {
-      console.error('Failed to load demo:', err);
-    } finally {
-      setLoadingDemo(false);
-    }
-  };
-
   return (
     <BrowserRouter>
       <Routes>
@@ -133,8 +113,6 @@ export const App: React.FC = () => {
               selectedDataset={selectedDataset}
               datasets={datasets}
               onSelectDataset={setSelectedDataset}
-              onLoadDemo={handleLoadDemo}
-              isLoadingDemo={loadingDemo}
             >
               <Routes>
                 <Route

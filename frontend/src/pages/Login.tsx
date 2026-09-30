@@ -146,7 +146,7 @@ export const Login: React.FC = () => {
             <div className="w-full border-t border-slate-800" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-slate-900 px-2 text-slate-500 font-semibold tracking-wider">or instant demo</span>
+            <span className="bg-slate-900 px-2 text-slate-500 font-semibold tracking-wider">or fast access</span>
           </div>
         </div>
 
@@ -156,7 +156,7 @@ export const Login: React.FC = () => {
           className="w-full py-2.5 px-4 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-cyan-400 border border-slate-700/80 font-medium text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>Launch As Demo Admin</span>
+          <span>Quick Admin Access (1-Click)</span>
         </button>
 
         <div className="mt-4 text-center">

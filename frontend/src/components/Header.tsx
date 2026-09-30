@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Database, LogOut, RefreshCw, FileText, Shield } from 'lucide-react';
+import { Database, LogOut, FileText, Shield, Cloud, Flame } from 'lucide-react';
 import { clearAuthToken } from '../api/client';
 import { HashBadge } from './HashBadge';
 import { Dataset } from '../types';
@@ -10,8 +10,6 @@ interface HeaderProps {
   datasets?: Dataset[];
   selectedDataset?: Dataset | null;
   onSelectDataset?: (dataset: Dataset) => void;
-  onLoadDemo?: () => void;
-  isLoadingDemo?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,8 +17,6 @@ export const Header: React.FC<HeaderProps> = ({
   datasets = [],
   selectedDataset,
   onSelectDataset,
-  onLoadDemo,
-  isLoadingDemo = false,
 }) => {
   const handleLogout = () => {
     clearAuthToken();
@@ -58,16 +54,14 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        {onLoadDemo && (
-          <button
-            onClick={onLoadDemo}
-            disabled={isLoadingDemo}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-semibold transition-all disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDemo ? 'animate-spin' : ''}`} />
-            {isLoadingDemo ? 'Loading Demo...' : 'Load Enterprise Demo'}
-          </button>
-        )}
+        <div className="hidden lg:flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-[11px] font-mono">
+            <Cloud className="w-3 h-3" /> Cloudinary: bgrvz383
+          </span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono">
+            <Flame className="w-3 h-3" /> Firestore: titan-d57bf
+          </span>
+        </div>
 
         <Link
           to="/"
@@ -79,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
         </Link>
 
         <button
-          onClick={() => window.open('/docs', '_blank')}
+          onClick={() => window.open('http://127.0.0.1:8000/docs', '_blank')}
           title="Open API Docs (Swagger)"
           className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
         >

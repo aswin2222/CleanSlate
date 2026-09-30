@@ -743,7 +743,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                 className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold text-xs py-2.5 px-4 rounded-full transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Instant 1-Click Launch (Admin Demo)</span>
+                <span>Instant 1-Click Launch (Admin Access)</span>
               </button>
             </div>
           </div>

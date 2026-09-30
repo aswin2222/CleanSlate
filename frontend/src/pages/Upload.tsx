@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { Dataset, UploadGuardResponse } from '../types';
+import { uploadToCloudinary } from '../utils/cloudinary';
+import { syncDatasetToFirestore, logAuditToFirestore } from '../firebase/config';
 import {
   UploadCloud,
   FileCode,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
-  Sparkles,
+  ExternalLink,
+  Cloud,
+  Flame,
 } from 'lucide-react';
 
 interface UploadProps {
@@ -20,15 +24,16 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
   const [file, setFile] = useState<File | null>(null);
   const [format, setFormat] = useState('csv');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<string>('');
   const [uploadResult, setUploadResult] = useState<UploadGuardResponse | null>(null);
+  const [cloudinaryUrl, setCloudinaryUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingDemo, setLoadingDemo] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
       setFile(selected);
-      // Auto detect format from extension
       const ext = selected.name.split('.').pop()?.toLowerCase();
       if (ext === 'json') setFormat('json');
       else if (ext === 'parquet') setFormat('parquet');
@@ -43,20 +48,73 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
     setUploading(true);
     setError(null);
     setUploadResult(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('format', format);
+    setCloudinaryUrl(null);
+    setUploadProgress(15);
+    setUploadStage('Uploading to Cloudinary (bgrvz383)...');
 
     try {
+      // 1. Upload to Cloudinary directly with preset TITAN-project
+      let cloudUrl = '';
+      try {
+        const cloudRes = await uploadToCloudinary(file, (percent) => {
+          setUploadProgress(Math.min(50, Math.round(percent / 2)));
+        });
+        cloudUrl = cloudRes.secure_url;
+        setCloudinaryUrl(cloudUrl);
+        setUploadProgress(60);
+      } catch (cloudErr: any) {
+        console.warn('Cloudinary direct upload note:', cloudErr.message);
+      }
+
+      // 2. Ingest into CleanSlate backend engine
+      setUploadStage('Running Guardrails & SHA-256 Hash Verification...');
+      setUploadProgress(75);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('format', format);
+
       const res = await apiRequest<UploadGuardResponse>('/api/datasets/upload', {
         method: 'POST',
         body: formData,
       });
+
+      if (cloudUrl && res.dataset) {
+        res.dataset.cloudinary_url = cloudUrl;
+      }
+
       setUploadResult(res);
+      setUploadProgress(90);
+
+      // 3. Sync to Firebase Firestore
       if (res.dataset) {
+        setUploadStage('Syncing metadata to Firebase Firestore (titan-d57bf)...');
+        await syncDatasetToFirestore({
+          id: res.dataset.id,
+          filename: res.dataset.filename,
+          rows: res.dataset.rows,
+          cols: res.dataset.cols,
+          format: res.dataset.format,
+          canonical_hash: res.dataset.canonical_hash,
+          cloudinary_url: cloudUrl || res.dataset.cloudinary_url,
+          created_at: res.dataset.created_at,
+        });
+
+        await logAuditToFirestore({
+          actor: 'current_user',
+          event: 'DATASET_UPLOAD_SUCCESS',
+          dataset_id: res.dataset.id,
+          details: {
+            filename: file.name,
+            rows: res.dataset.rows,
+            cloudinary: cloudUrl || 'active',
+          },
+          timestamp: new Date().toISOString(),
+        });
+
         onDatasetLoaded(res.dataset);
       }
+      setUploadProgress(100);
+      setUploadStage('Completed successfully!');
     } catch (err: any) {
       setError(err.message || 'File upload failed');
     } finally {
@@ -64,27 +122,25 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
     }
   };
 
-  const handleLoadDemo = async () => {
-    setLoadingDemo(true);
-    setError(null);
-    try {
-      const res = await apiRequest<{ dataset: Dataset }>('/api/datasets/demo', { method: 'POST' });
-      onDatasetLoaded(res.dataset);
-      navigate('/profile');
-    } catch (err: any) {
-      setError(err.message || 'Demo synthesis failed');
-    } finally {
-      setLoadingDemo(false);
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight">Upload Enterprise Dataset</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Supports CSV, JSON, Parquet, and Excel formats. Upload Guard runs adversarial checks, strips formula injections, and calculates canonical SHA-256 hash.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-tight">Upload Dataset</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Files are stored in Cloudinary, synced to Firebase Firestore, and secured by CleanSlate.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-[11px] font-medium">
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Cloudinary: bgrvz383</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-medium">
+            <Flame className="w-3.5 h-3.5" />
+            <span>Firestore: titan-d57bf</span>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -102,12 +158,26 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
               <CheckCircle2 className="w-5 h-5" />
               <span>Ingested & Secured Successfully</span>
             </div>
-            <button
-              onClick={() => navigate('/profile')}
-              className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors"
-            >
-              Inspect Profile →
-            </button>
+            <div className="flex items-center gap-2">
+              {(cloudinaryUrl || uploadResult.dataset.cloudinary_url) && (
+                <a
+                  href={cloudinaryUrl || uploadResult.dataset.cloudinary_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>Cloudinary URL</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              <button
+                onClick={() => navigate('/profile')}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors"
+              >
+                Inspect Profile →
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 text-xs">
@@ -124,8 +194,8 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
               <div className="font-bold text-amber-400 font-mono text-sm">{uploadResult.formula_injection_cells_detected} neutralized</div>
             </div>
             <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-slate-400">Quarantine Rows</div>
-              <div className="font-bold text-cyan-400 font-mono text-sm">{uploadResult.quarantined_count}</div>
+              <div className="text-slate-400">Storage & DB</div>
+              <div className="font-bold text-cyan-400 font-mono text-xs truncate">Cloudinary + Firestore</div>
             </div>
           </div>
         </div>
@@ -147,9 +217,24 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
           <p className="text-xs text-slate-500 mt-1">
             {file
               ? `${(file.size / 1024).toFixed(1)} KB selected`
-              : 'CSV, JSON Lines, Parquet, or Excel (up to 50MB)'}
+              : 'CSV, JSON Lines, Parquet, or Excel format'}
           </p>
         </div>
+
+        {uploading && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>{uploadStage}</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -170,33 +255,23 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-              Upload Guard Level
+              Storage & Database
             </label>
             <div className="flex items-center gap-2 h-9 px-3 bg-slate-800/60 border border-slate-700/60 rounded-lg text-xs text-emerald-400 font-mono">
               <ShieldCheck className="w-4 h-4" />
-              <span>Full Adversarial Defense Active</span>
+              <span>Cloudinary (bgrvz383) + Firestore Live</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-          <button
-            type="button"
-            onClick={handleLoadDemo}
-            disabled={loadingDemo}
-            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-medium border border-slate-700 flex items-center gap-2 transition-all disabled:opacity-50"
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${loadingDemo ? 'animate-spin' : ''}`} />
-            {loadingDemo ? 'Synthesizing...' : 'Or Load 500-Row Enterprise Messy Demo'}
-          </button>
-
+        <div className="flex items-center justify-end pt-4 border-t border-slate-800">
           <button
             type="submit"
             disabled={!file || uploading}
             className="px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 flex items-center gap-2"
           >
             <FileCode className="w-4 h-4" />
-            {uploading ? 'Processing Guard & Hash...' : 'Ingest & Secure Dataset'}
+            {uploading ? 'Uploading to Cloudinary & Securing...' : 'Upload & Clean Dataset'}
           </button>
         </div>
       </form>

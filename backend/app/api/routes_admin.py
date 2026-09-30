@@ -21,6 +21,9 @@ admin_router = APIRouter(tags=["Admin & Demo"])
 
 
 @admin_router.get("/audit")
+@admin_router.get("/audit-logs")
+@admin_router.get("/admin/audit")
+@admin_router.get("/admin/audit-logs")
 def get_audit_trail(
     run_id: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
@@ -33,6 +36,12 @@ def get_audit_trail(
         query = query.filter(AuditEvent.run_id == run_id)
     events = query.order_by(AuditEvent.ts.desc()).limit(limit).all()
 
+    def _safe_json(s: str) -> Any:
+        try:
+            return json.loads(s) if s else {}
+        except Exception:
+            return {"raw": s}
+
     return [
         {
             "id": e.id,
@@ -40,7 +49,7 @@ def get_audit_trail(
             "actor": e.actor,
             "run_id": e.run_id,
             "event": e.event,
-            "details": json.loads(e.details_json),
+            "details": _safe_json(e.details_json),
         }
         for e in events
     ]

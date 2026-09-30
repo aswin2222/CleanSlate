@@ -52,6 +52,7 @@ class Dataset(Base):
     cols = Column(Integer, default=0, nullable=False)
     size_bytes = Column(Integer, default=0, nullable=False)
     encrypted = Column(Boolean, default=True, nullable=False)
+    cloudinary_url = Column(String(512), default="", nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     owner = relationship("User", back_populates="datasets")

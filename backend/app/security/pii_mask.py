@@ -31,6 +31,12 @@ def mask_pii_value(value: str) -> str:
     return masked
 
 
+def mask_pii(value: str) -> str:
+    """Alias for mask_pii_value."""
+    return mask_pii_value(value)
+
+
+
 def mask_sample_values(values: Sequence[str], max_samples: int = 5) -> List[str]:
     """
     Selects up to max_samples distinct non-empty values and returns PII-masked representations.

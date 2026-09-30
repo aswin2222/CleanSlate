@@ -83,10 +83,12 @@ def evaluate_sparsity(
         )
 
     overall_sparsity = total_missing_cells / (total_rows * total_cols) if total_rows * total_cols > 0 else 0.0
+    if total_rows < min_rows or overall_sparsity >= 0.95:
+        is_low_evidence = True
 
     if is_low_evidence:
         summary_sentence = (
-            f"Dataset has only {total_rows} rows (below minimum {min_rows}). Flagged as LOW_EVIDENCE; all automatic rule induction and imputation will be suppressed."
+            f"Dataset has low evidence (rows={total_rows}, sparsity={overall_sparsity * 100:.1f}%). Flagged as LOW_EVIDENCE; all automatic rule induction and imputation will be suppressed."
         )
     elif extreme_sparse_cols:
         summary_sentence = (

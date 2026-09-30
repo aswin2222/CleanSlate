@@ -136,3 +136,18 @@ def run_semantic_inference(
                 r.source = RuleSource.HEURISTIC
 
     return column_semantics, verified_rules
+
+
+class SemanticInferenceEngine:
+    """Class wrapper for inferring semantic tags and verifying rules."""
+
+    def __init__(self, mode: str = "heuristic_only"):
+        self.mode = mode
+
+    def infer(self, df: pd.DataFrame, profile: Optional[DatasetProfile] = None) -> List[Rule]:
+        if profile is None:
+            from app.profiling.profiler import profile_dataset
+            profile = profile_dataset(df)
+        _, rules = run_semantic_inference(profile, df)
+        return rules
+

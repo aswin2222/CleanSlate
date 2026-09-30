@@ -65,3 +65,23 @@ def escape_cell_text(value: Any) -> str:
     if value is None:
         return ""
     return html.escape(str(value), quote=True)
+
+
+def sanitize_formula_injection(value: Any) -> str:
+    """Alias for neutralize_for_export."""
+    return neutralize_for_export(value)
+
+
+def strip_null_bytes(raw: bytes) -> Tuple[bytes, int]:
+    """Strips embedded null bytes from byte sequences and reports count."""
+    count = raw.count(b"\x00")
+    cleaned = raw.replace(b"\x00", b"")
+    return cleaned, count
+
+
+def sanitize_column_name(col_name: str) -> str:
+    """Sanitizes column name, removing path traversal, control chars, and SQL comment markers."""
+    clean = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", col_name)
+    clean = re.sub(r"[\;\'\"`\-\-\/\\]+", "_", clean).strip(" _")
+    return clean or "col"
+

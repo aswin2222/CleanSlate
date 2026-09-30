@@ -73,7 +73,11 @@ class NormalizeMissingMarkers(Transformation):
         delta = Delta(transformation=self.name, metadata={"columns": cols})
 
         for col in cols:
+            if not pd.api.types.is_object_dtype(new_df[col]):
+                new_df[col] = new_df[col].astype(object)
             for idx, val in enumerate(new_df[col]):
+                if pd.isna(val):
+                    continue
                 s_val = str(val)
                 if s_val != "" and is_missing(s_val):
                     rid = int(new_df[ROW_ID_COL].iloc[idx]) if ROW_ID_COL in new_df.columns else idx

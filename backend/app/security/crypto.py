@@ -39,5 +39,35 @@ class DataEncryptor:
         """Decrypts bytes, authenticating ciphertext."""
         return self.fernet.decrypt(encrypted_data)
 
+    def encrypt(self, data: Any) -> bytes:
+        """Encrypts serializable or bytes data."""
+        if isinstance(data, (dict, list)):
+            import json
+            raw = json.dumps(data).encode("utf-8")
+        elif isinstance(data, str):
+            raw = data.encode("utf-8")
+        else:
+            raw = bytes(data)
+        return self.encrypt_bytes(raw)
+
+    def decrypt(self, encrypted_data: bytes) -> Optional[Any]:
+        """Decrypts bytes, returning None if invalid token."""
+        try:
+            dec = self.decrypt_bytes(encrypted_data)
+            try:
+                import json
+                return json.loads(dec.decode("utf-8"))
+            except Exception:
+                return dec
+        except Exception:
+            return None
+
+
+class FernetVault(DataEncryptor):
+    """Alias for DataEncryptor with dict encryption/decryption."""
+    def __init__(self, secret_key: Optional[str] = None):
+        super().__init__(key=secret_key)
+
 
 encryptor = DataEncryptor()
+

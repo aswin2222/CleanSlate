@@ -281,7 +281,7 @@ def profile_dataset(
         row_strings = (
             df[data_cols]
             .astype(str)
-            .apply(lambda r: " ".join(r.values).lower().strip(), axis=1)
+            .apply(lambda r: " ".join(str(x) for x in r.values).lower().strip(), axis=1)
             .tolist()
         )
         # Pairwise comparison
@@ -310,3 +310,14 @@ def profile_dataset(
         undecodable_byte_count=undecodable_byte_count,
         summary_text=summary_text,
     )
+
+
+class DatasetProfiler:
+    """Class wrapper for profiling datasets."""
+
+    def __init__(self, max_near_dupe_rows: int = 500):
+        self.max_near_dupe_rows = max_near_dupe_rows
+
+    def profile(self, df: pd.DataFrame) -> DatasetProfile:
+        return profile_dataset(df, max_near_dupe_rows=self.max_near_dupe_rows)
+

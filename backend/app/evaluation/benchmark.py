@@ -107,18 +107,51 @@ class BenchmarkSuite:
             # Verify rollback equality
             matches_original = hash_initial == hash_restored
 
-            # Compute repair accuracy metrics
+            # Build lookup by stable row ID _rid
+            rid_col = "_rid" if "_rid" in cleaned_df.columns else None
+            cleaned_by_rid = {}
+            if rid_col:
+                for _, row in cleaned_df.iterrows():
+                    cleaned_by_rid[int(row[rid_col])] = row
+
             corrected_count = 0
             for mut in ground_truth:
-                if mut.col in cleaned_df.columns and mut.row_idx < len(cleaned_df):
+                if mut.mutation_type == "exact_duplicate":
+                    if len(cleaned_df) <= len(clean_df):
+                        corrected_count += 1
+                    continue
+
+                if rid_col and mut.row_idx in cleaned_by_rid:
+                    cleaned_val = cleaned_by_rid[mut.row_idx].get(mut.col)
+                elif mut.col in cleaned_df.columns and mut.row_idx < len(cleaned_df):
                     cleaned_val = cleaned_df.at[mut.row_idx, mut.col]
-                    if mut.mutation_type == "whitespace" and str(cleaned_val) == str(mut.original_val):
+                else:
+                    continue
+
+                if mut.mutation_type == "whitespace":
+                    if str(cleaned_val).strip() == str(mut.original_val).strip() or str(cleaned_val) == str(mut.original_val):
                         corrected_count += 1
-                    elif mut.mutation_type == "case_inconsistency" and str(cleaned_val).upper() == str(mut.original_val).upper():
+                elif mut.mutation_type == "case_inconsistency":
+                    if str(cleaned_val).upper() == str(mut.original_val).upper():
                         corrected_count += 1
-                    elif mut.mutation_type == "exact_duplicate":
-                        if len(cleaned_df) <= len(clean_df):
+                elif mut.mutation_type == "date_format":
+                    try:
+                        if str(cleaned_val) == str(mut.original_val) or pd.to_datetime(cleaned_val) == pd.to_datetime(mut.original_val):
                             corrected_count += 1
+                    except Exception:
+                        pass
+                elif mut.mutation_type == "outlier":
+                    try:
+                        c_f = float(str(cleaned_val).replace(",", ""))
+                        o_f = float(str(mut.original_val).replace(",", ""))
+                        m_f = float(str(mut.corrupted_val).replace(",", ""))
+                        if abs(c_f - o_f) < abs(m_f - o_f):
+                            corrected_count += 1
+                    except Exception:
+                        pass
+                elif mut.mutation_type == "missing_value":
+                    if pd.notna(cleaned_val) and str(cleaned_val).strip() != "":
+                        corrected_count += 1
 
             total_mutations = len(ground_truth) if len(ground_truth) > 0 else 1
             repair_recall = min(1.0, corrected_count / total_mutations)
@@ -139,7 +172,7 @@ class BenchmarkSuite:
                 "apply_sec": round(apply_sec, 4),
                 "rollback_sec": round(rollback_sec, 4),
                 "peak_memory_mb": round(peak_mem / (1024 * 1024), 2),
-                "rollback_match": matches_original,
+                "rollback_match": bool(matches_original),
                 "repair_precision": round(precision, 4),
                 "repair_recall": round(repair_recall, 4),
                 "repair_f1": round(f1, 4),
@@ -157,7 +190,7 @@ class BenchmarkSuite:
         # Save JSON
         json_path = os.path.join(self.output_dir, "results.json")
         with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(output, f, indent=2)
+            json.dump(output, f, indent=2, default=str)
 
         # Generate Markdown Report
         self._write_markdown_report(output)

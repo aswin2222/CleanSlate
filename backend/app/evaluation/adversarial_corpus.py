@@ -24,13 +24,13 @@ class AdversarialTestResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "vector_id": self.vector_id,
-            "name": self.name,
-            "category": self.category,
-            "defended": self.defended,
-            "http_expected": self.http_expected,
-            "http_actual": self.http_actual,
-            "notes": self.notes,
+            "vector_id": str(self.vector_id),
+            "name": str(self.name),
+            "category": str(self.category),
+            "defended": bool(self.defended),
+            "http_expected": int(self.http_expected),
+            "http_actual": int(self.http_actual),
+            "notes": str(self.notes),
         }
 
 

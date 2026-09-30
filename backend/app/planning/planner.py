@@ -56,7 +56,8 @@ class TransformationPlanner:
             t = registry.get("normalize_missing_markers")
             if t:
                 step = t.plan(df, {"columns": missing_markers_cols})
-                proposed_steps.append(step)
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
 
         # 2. Trim whitespace
         ws_cols = [
@@ -67,9 +68,22 @@ class TransformationPlanner:
             t = registry.get("trim_whitespace")
             if t:
                 step = t.plan(df, {"columns": ws_cols})
-                proposed_steps.append(step)
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
 
-        # 3. Numeric parsing
+        # 3. Case normalization
+        case_cols = [
+            c for c, cp in profile.columns.items()
+            if cp.case_inconsistencies > 0 and c in data_cols
+        ]
+        if case_cols:
+            t = registry.get("normalize_case")
+            if t:
+                step = t.plan(df, {"columns": case_cols, "case": "upper"})
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
+
+        # 4. Numeric parsing
         num_cols = [
             c for c, cp in profile.columns.items()
             if cp.is_numeric and c in data_cols
@@ -81,7 +95,7 @@ class TransformationPlanner:
                 if step.predicted_loss.cells_modified > 0:
                     proposed_steps.append(step)
 
-        # 4. Date standardization
+        # 5. Date standardization
         date_cols = [
             c for c, cp in profile.columns.items()
             if (cp.primary_type == "date" or len(cp.format_variants) > 1) and c in data_cols
@@ -93,14 +107,50 @@ class TransformationPlanner:
                 if step.predicted_loss.cells_modified > 0:
                     proposed_steps.append(step)
 
-        # 5. Exact deduplication
+        # 6. Exact deduplication
         if profile.exact_duplicate_rows > 0:
             t = registry.get("dedupe_exact")
             if t:
                 step = t.plan(df, {"subset": data_cols})
-                proposed_steps.append(step)
+                if step.predicted_loss.rows_removed > 0:
+                    proposed_steps.append(step)
 
-        # 6. Rule-driven transformations (Arithmetic, drop rows, outliers)
+        # 7. Outlier Winsorization / Capping
+        outlier_cols = [
+            c for c, cp in profile.columns.items()
+            if cp.is_numeric and cp.iqr_outliers_count > 0 and c in data_cols
+        ]
+        if outlier_cols:
+            t = registry.get("cap_outliers")
+            if t:
+                step = t.plan(df, {"columns": outlier_cols, "method": "iqr"})
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
+
+        # 8. Safe Imputation (subject to strict <=30% missing guardrails)
+        impute_num_cols = [
+            c for c, cp in profile.columns.items()
+            if cp.is_numeric and 0.0 < cp.null_rate <= 0.30 and c in data_cols
+        ]
+        if impute_num_cols:
+            t = registry.get("impute_median")
+            if t:
+                step = t.plan(df, {"columns": impute_num_cols})
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
+
+        impute_cat_cols = [
+            c for c, cp in profile.columns.items()
+            if not cp.is_numeric and 0.0 < cp.null_rate <= 0.30 and c in data_cols
+        ]
+        if impute_cat_cols:
+            t = registry.get("impute_mode")
+            if t:
+                step = t.plan(df, {"columns": impute_cat_cols})
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
+
+        # 9. Rule-driven transformations (Arithmetic, drop rows)
         active_rules = [r for r in rules if r.status == RuleStatus.ACTIVE and r.violation_count > 0]
         for rule in active_rules:
             if rule.kind == RuleKind.ARITHMETIC:
@@ -108,7 +158,8 @@ class TransformationPlanner:
                 if t:
                     step = t.plan(df, rule.params)
                     step.rule_refs.append(rule.id)
-                    proposed_steps.append(step)
+                    if step.predicted_loss.cells_modified > 0:
+                        proposed_steps.append(step)
 
             elif rule.kind in (RuleKind.DATE_ORDER, RuleKind.NON_NEGATIVE, RuleKind.RANGE):
                 # When violation exists on active rule, propose drop_rows_violating
@@ -130,9 +181,10 @@ class TransformationPlanner:
                     step.rule_refs.append(rule.id)
                     # Hard gate: always requires explicit approval
                     step.requires_approval = True
-                    proposed_steps.append(step)
+                    if step.predicted_loss.rows_removed > 0:
+                        proposed_steps.append(step)
 
-        # 7. Category consolidation (if case inconsistencies detected)
+        # 10. Category consolidation
         cat_cols = [
             c for c, cp in profile.columns.items()
             if cp.case_inconsistencies > 0 and c in data_cols

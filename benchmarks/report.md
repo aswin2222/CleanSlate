@@ -1,6 +1,6 @@
 # CleanSlate Empirical Benchmark & Evaluation Report
 
-**Generated:** 2026-09-30 12:06:34 UTC  
+**Generated:** 2026-09-30 13:49:17 UTC  
 **Environment:** Python 3.11 / Pandas 2.2 / Antigravity L1-L4  
 **Rollback Canonical Fidelity:** 100.0%  
 
@@ -8,19 +8,19 @@
 
 | Rows | Total (s) | Throughput (rows/s) | Profile (s) | Plan (s) | Apply (s) | Rollback (s) | Peak RAM (MB) | Rollback Equality |
 |---|---|---|---|---|---|---|---|---|
-| 100 | 0.38s | 263.2 | 0.0974s | 0.0258s | 0.1544s | 0.03s | 0.62 MB | **MATCH (100%)** |
-| 500 | 1.1815s | 423.2 | 0.2073s | 0.0668s | 0.5056s | 0.0931s | 0.75 MB | **MATCH (100%)** |
-| 1,000 | 2.4519s | 407.8 | 0.3983s | 0.1129s | 0.9902s | 0.176s | 0.96 MB | **MATCH (100%)** |
-| 5,000 | 11.2051s | 446.2 | 1.9369s | 0.523s | 4.8844s | 0.8241s | 3.3 MB | **MATCH (100%)** |
+| 100 | 6.3409s | 15.8 | 0.1813s | 0.0696s | 0.5644s | 0.0657s | 3.01 MB | **MATCH (100%)** |
+| 500 | 10.2092s | 49.0 | 0.3938s | 0.1593s | 1.905s | 0.204s | 0.86 MB | **MATCH (100%)** |
+| 1,000 | 12.7282s | 78.6 | 0.8689s | 0.305s | 3.7354s | 0.3675s | 1.19 MB | **MATCH (100%)** |
+| 5,000 | 44.3222s | 112.8 | 3.3164s | 1.5375s | 17.2354s | 1.7773s | 3.96 MB | **MATCH (100%)** |
 
 ## 2. Ground-Truth Repair Accuracy
 
 | Rows | Injected Mutations | Repair Precision | Repair Recall | Repair F1 | Loss Index |
 |---|---|---|---|---|---|
-| 100 | Synthetic | 0.98 | 0.3978 | **0.5659** | 4.7% |
-| 500 | Synthetic | 0.98 | 0.3918 | **0.5597** | 2.26% |
-| 1,000 | Synthetic | 0.98 | 0.3628 | **0.5296** | 1.96% |
-| 5,000 | Synthetic | 0.98 | 0.3793 | **0.5469** | 1.66% |
+| 100 | Synthetic | 0.98 | 0.9462 | **0.9628** | 3.39% |
+| 500 | Synthetic | 0.98 | 0.9237 | **0.951** | 1.81% |
+| 1,000 | Synthetic | 0.98 | 0.9125 | **0.945** | 1.89% |
+| 5,000 | Synthetic | 0.98 | 0.9072 | **0.9422** | 1.67% |
 
 ## 3. Key Empirical Findings
 

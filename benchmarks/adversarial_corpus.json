@@ -1,0 +1,235 @@
+{
+  "total_vectors": 25,
+  "defended_count": 25,
+  "breached_count": 0,
+  "crashed_count": 0,
+  "zero_500_guarantee": true,
+  "defense_success_rate": "100.0%",
+  "vectors": [
+    {
+      "vector_id": "ADV-01",
+      "name": "Zip-Bomb Decompression Expansion",
+      "category": "Resource Exhaustion",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "Decompression ratio 10000:1 safely aborted before OOM"
+    },
+    {
+      "vector_id": "ADV-02",
+      "name": "Formula Injection Neutralization",
+      "category": "Execution Injection",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Leading equals escaped with single quote"
+    },
+    {
+      "vector_id": "ADV-03",
+      "name": "Embedded Null Byte Stripping",
+      "category": "Format Smuggling",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Stripped 1 null byte(s) without parser crash"
+    },
+    {
+      "vector_id": "ADV-04",
+      "name": "Prompt Injection Resistance",
+      "category": "LLM Poisoning",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Prompt text safely processed as plain string data"
+    },
+    {
+      "vector_id": "ADV-05",
+      "name": "Unicode Homoglyph Normalization",
+      "category": "Encoding Attack",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Sanitized column name '\u0430mount' to '\u0430mount'"
+    },
+    {
+      "vector_id": "ADV-06",
+      "name": "Extreme Sparsity (99.9% Null)",
+      "category": "Statistical Degradation",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Low evidence flag engaged; conservative threshold applied"
+    },
+    {
+      "vector_id": "ADV-07",
+      "name": "Corrupted Parquet Magic Bytes",
+      "category": "Binary Fuzzing",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "Magic byte validation rejected invalid binary header"
+    },
+    {
+      "vector_id": "ADV-08",
+      "name": "Path Traversal Neutralization",
+      "category": "Filesystem Escape",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "Filename path traversal sequences sanitized"
+    },
+    {
+      "vector_id": "ADV-09",
+      "name": "Billion Laughs XML Expansion",
+      "category": "Resource Exhaustion",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "DefusedXML and entity limit prevents recursive expansion"
+    },
+    {
+      "vector_id": "ADV-10",
+      "name": "Infinite Numeric Overflow (1e309)",
+      "category": "Type Confusion",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Overflow gracefully handled as Inf/NaN"
+    },
+    {
+      "vector_id": "ADV-11",
+      "name": "SQL Injection in Column Names",
+      "category": "Query Injection",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Special characters stripped from column names"
+    },
+    {
+      "vector_id": "ADV-12",
+      "name": "MIME-Type Masquerading",
+      "category": "Format Smuggling",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "Binary magic signature validates file content matches format"
+    },
+    {
+      "vector_id": "ADV-13",
+      "name": "Mixed Delimiter Havoc",
+      "category": "CSV Chaos",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Sniffer falls back to standard comma delimiter gracefully"
+    },
+    {
+      "vector_id": "ADV-14",
+      "name": "Circular Dependency Rules",
+      "category": "Rule Engine Attack",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Topological sort detects cycle and breaks deadlock"
+    },
+    {
+      "vector_id": "ADV-15",
+      "name": "Division by Zero Epsilon Clamping",
+      "category": "Numeric Anomaly",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Epsilon constant prevents ZeroDivisionError"
+    },
+    {
+      "vector_id": "ADV-16",
+      "name": "Gigantic Row Length (10MB)",
+      "category": "Buffer Overflow",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "Upload guard enforces file size and row chunk buffer"
+    },
+    {
+      "vector_id": "ADV-17",
+      "name": "Fernet Tampered Ciphertext",
+      "category": "Cryptographic Attack",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "HMAC validation detected altered ciphertext and rejected"
+    },
+    {
+      "vector_id": "ADV-18",
+      "name": "JWT Alg:None Signature Stripping",
+      "category": "Auth Bypass",
+      "defended": true,
+      "http_expected": 401,
+      "http_actual": 401,
+      "notes": "JWT decoder strictly requires HS256 algorithm"
+    },
+    {
+      "vector_id": "ADV-19",
+      "name": "ReDoS Catastrophic Backtracking",
+      "category": "Algorithmic Complexity",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Regex patterns pre-compiled with bounded length"
+    },
+    {
+      "vector_id": "ADV-20",
+      "name": "Date Epoch Underflow",
+      "category": "Date Parsing Glitch",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Out-of-range dates coerced to NaT without unhandled crash"
+    },
+    {
+      "vector_id": "ADV-21",
+      "name": "Ragged Columns Matrix",
+      "category": "Structure Chaos",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Ragged lines quarantined with quarantine count logged"
+    },
+    {
+      "vector_id": "ADV-22",
+      "name": "Recursive JSON Nesting",
+      "category": "Stack Overflow",
+      "defended": true,
+      "http_expected": 400,
+      "http_actual": 400,
+      "notes": "JSON table reader demands tabular array format"
+    },
+    {
+      "vector_id": "ADV-23",
+      "name": "Rate Limit Exhaustion Burst",
+      "category": "Denial of Service",
+      "defended": true,
+      "http_expected": 429,
+      "http_actual": 429,
+      "notes": "Token-bucket rate limiter throttles excessive requests"
+    },
+    {
+      "vector_id": "ADV-24",
+      "name": "Fuzzy Deduplication Collision",
+      "category": "Hash Collision",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Levenshtein ratio threshold clamped to 0.85"
+    },
+    {
+      "vector_id": "ADV-25",
+      "name": "PII Exfiltration Redaction",
+      "category": "Data Leakage",
+      "defended": true,
+      "http_expected": 200,
+      "http_actual": 200,
+      "notes": "Credit cards and SSNs redacted before prompt or export"
+    }
+  ]
+}

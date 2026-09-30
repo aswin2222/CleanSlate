@@ -121,6 +121,36 @@ def create_run(
     )
 
 
+@runs_router.get("/runs", response_model=List[RunResponse])
+def list_runs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[RunResponse]:
+    """Retrieves all pipeline runs belonging to current user (or all if admin)."""
+    if current_user.role == "admin":
+        runs = db.query(Run).order_by(Run.created_at.desc()).all()
+    else:
+        runs = (
+            db.query(Run)
+            .join(Dataset, Run.dataset_id == Dataset.id)
+            .filter(Dataset.owner_id == current_user.id)
+            .order_by(Run.created_at.desc())
+            .all()
+        )
+    return [
+        RunResponse(
+            id=run.id,
+            dataset_id=run.dataset_id,
+            status=run.status,
+            llm_mode=run.llm_mode,
+            config_json=run.config_json or "{}",
+            created_at=run.created_at.isoformat() if run.created_at else "",
+            updated_at=run.updated_at.isoformat() if run.updated_at else "",
+        )
+        for run in runs
+    ]
+
+
 @runs_router.get("/runs/{run_id}", response_model=RunResponse)
 def get_run(
     run_id: str,

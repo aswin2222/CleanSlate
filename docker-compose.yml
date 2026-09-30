@@ -10,14 +10,18 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://cleanslate:cleanslate_secure_2026@postgres:5432/cleanslate
-      - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=prod_super_secure_jwt_secret_token_cleanslate_2026_enterprise
-      - DATA_ENCRYPTION_KEY=MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
-      - MAX_UPLOAD_BYTES=52428800
-      - PROMETHEUS_METRICS=true
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cleanslate}:${POSTGRES_PASSWORD:-cleanslate_secure_2026}@postgres:5432/${POSTGRES_DB:-cleanslate}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - JWT_SECRET=${JWT_SECRET:-prod_super_secure_jwt_secret_token_cleanslate_2026_enterprise}
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=}
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-52428800}
+      - PROMETHEUS_METRICS=${PROMETHEUS_METRICS:-true}
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      - LLM_MODEL=${LLM_MODEL:-openai/gpt-oss-120b}
+      - LLM_API_KEY=${LLM_API_KEY:-${GROQ_API_KEY:-}}
     volumes:
       - storage_data:/app/storage
     depends_on:
@@ -46,13 +50,13 @@ services:
     container_name: cleanslate-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: cleanslate
-      POSTGRES_PASSWORD: cleanslate_secure_2026
-      POSTGRES_DB: cleanslate
+      POSTGRES_USER: ${POSTGRES_USER:-cleanslate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cleanslate_secure_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-cleanslate}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cleanslate -d cleanslate"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cleanslate} -d ${POSTGRES_DB:-cleanslate}"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -45,3 +45,14 @@ def readiness(db: Session = Depends(get_db)) -> Dict[str, str]:
         )
 
     return {"status": "ready"}
+
+
+@health_router.get("/health", status_code=status.HTTP_200_OK)
+def overall_health(db: Session = Depends(get_db)) -> Dict[str, str]:
+    """Overall health check returning system and DB status."""
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
+    return {"status": "healthy", "database": db_status}

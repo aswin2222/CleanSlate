@@ -57,7 +57,8 @@ class LLMClient:
         self.timeout_s = settings.LLM_TIMEOUT_S
 
     def is_configured(self) -> bool:
-        self.reload_config()
+        if not getattr(self, "provider", None) or self.provider == "none":
+            self.reload_config()
         return (
             self.provider in ("openai_compatible", "groq", "openai")
             and bool(self.base_url)
@@ -94,9 +95,16 @@ class LLMClient:
             f"Allowed rule kinds: {[k.value for k in RuleKind]}."
         )
 
+        # Defend against fence breakout attacks
+        sanitized_summary = (
+            masked_summary_json
+            .replace("<<<END_DATA>>>", "[ESCAPED_FENCE]")
+            .replace("<<<DATA>>>", "[ESCAPED_FENCE]")
+        )
+
         user_prompt = (
             f"Dataset summary metadata:\n"
-            f"<<<DATA>>>\n{masked_summary_json}\n<<<END_DATA>>>\n"
+            f"<<<DATA>>>\n{sanitized_summary}\n<<<END_DATA>>>\n"
             f"Identify semantic tags and propose data integrity rules for columns: {valid_columns}."
         )
 

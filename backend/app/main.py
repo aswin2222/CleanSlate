@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
@@ -98,7 +98,16 @@ def prometheus_metrics() -> Response:
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-# Mount routers
+# Mount API routers under /api (for frontend SPA and Nginx reverse proxy)
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth_router)
+api_router.include_router(datasets_router)
+api_router.include_router(runs_router)
+api_router.include_router(admin_router)
+api_router.include_router(health_router)
+app.include_router(api_router)
+
+# Mount routers at root for direct calls and test compatibility
 app.include_router(auth_router)
 app.include_router(datasets_router)
 app.include_router(runs_router)

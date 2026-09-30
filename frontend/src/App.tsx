@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { getAuthToken, apiRequest } from './api/client';
 import { Dataset } from './types';
 
+import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Upload } from './pages/Upload';
@@ -41,7 +42,7 @@ const ProtectedLayout: React.FC<{
 
   const getPageTitle = (pathname: string): string => {
     switch (pathname) {
-      case '/':
+      case '/dashboard':
         return 'Enterprise Dashboard';
       case '/upload':
         return 'Dataset Ingestion & Upload Guard';
@@ -62,7 +63,7 @@ const ProtectedLayout: React.FC<{
       case '/audit':
         return 'Audit Logs & System Health';
       default:
-        return 'CleanSlate';
+        return 'CleanSlate Workspace';
     }
   };
 
@@ -123,6 +124,7 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route
           path="/*"
@@ -136,7 +138,7 @@ export const App: React.FC = () => {
             >
               <Routes>
                 <Route
-                  path="/"
+                  path="/dashboard"
                   element={
                     <Dashboard
                       selectedDataset={selectedDataset}
@@ -166,6 +168,7 @@ export const App: React.FC = () => {
                 <Route path="/adversarial" element={<AdversarialLab />} />
                 <Route path="/benchmarks" element={<Benchmarks />} />
                 <Route path="/audit" element={<AuditAndHealth />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </ProtectedLayout>
           }

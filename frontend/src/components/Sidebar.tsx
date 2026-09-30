@@ -12,6 +12,7 @@ import {
   BarChart3,
   Activity,
   Sparkles,
+  Shield,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,7 +21,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = () => {
   const navItems = [
-    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/upload', label: 'Upload Dataset', icon: UploadCloud },
     { to: '/profile', label: 'Dataset Profiler', icon: FileSearch },
     { to: '/rules', label: 'Inferred Rules', icon: Scale },
@@ -74,6 +75,16 @@ export const Sidebar: React.FC<SidebarProps> = () => {
             </NavLink>
           );
         })}
+
+        <div className="pt-3 mt-3 border-t border-slate-800/80">
+          <NavLink
+            to="/"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-400/90 hover:text-emerald-300 hover:bg-emerald-950/30 border border-emerald-500/20 transition-colors"
+          >
+            <Shield className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span className="truncate">ShieldSense Landing</span>
+          </NavLink>
+        </div>
       </nav>
 
       {/* Status Footer */}

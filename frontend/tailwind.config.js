@@ -7,7 +7,15 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Readex Pro"', 'Inter', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
       colors: {
+        neutral: {
+          850: '#1a1a1a',
+          950: '#0a0a0a',
+        },
         brand: {
           50: '#f0f9ff',
           100: '#e0f2fe',

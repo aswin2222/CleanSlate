@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { apiRequest, setAuthToken } from '../api/client';
-import { Sparkles, ArrowRight, ShieldCheck, Lock } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Lock, Shield } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('admin@cleanslate.local');
-  const [password, setPassword] = useState('CleanSlate2026!');
+  const [password, setPassword] = useState('cleanslate123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ export const Login: React.FC = () => {
         body: JSON.stringify({ email, password }),
       });
       setAuthToken(resp.access_token);
-      navigate('/');
+      navigate('/dashboard');
     } catch {
       // If failed, try register then login
       try {
@@ -35,7 +35,7 @@ export const Login: React.FC = () => {
           body: JSON.stringify({ email, password }),
         });
         setAuthToken(resp2.access_token);
-        navigate('/');
+        navigate('/dashboard');
       } catch (err2: any) {
         setError(err2.message || 'Authentication failed');
       }
@@ -46,14 +46,14 @@ export const Login: React.FC = () => {
 
   const handleQuickDemo = async () => {
     setEmail('admin@cleanslate.local');
-    setPassword('CleanSlate2026!');
+    setPassword('cleanslate123!');
     setLoading(true);
     setError(null);
     try {
       try {
         const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!' }),
+          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'cleanslate123!' }),
         });
         setAuthToken(resp.access_token);
       } catch {
@@ -67,7 +67,7 @@ export const Login: React.FC = () => {
         });
         setAuthToken(resp.access_token);
       }
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Demo login failed');
     } finally {
@@ -153,11 +153,21 @@ export const Login: React.FC = () => {
         <button
           onClick={handleQuickDemo}
           disabled={loading}
-          className="w-full py-2.5 px-4 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-cyan-400 border border-slate-700/80 font-medium text-sm flex items-center justify-center gap-2 transition-all"
+          className="w-full py-2.5 px-4 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-cyan-400 border border-slate-700/80 font-medium text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Launch As Demo Admin</span>
         </button>
+
+        <div className="mt-4 text-center">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>← Return to ShieldSense Landing Page</span>
+          </Link>
+        </div>
 
         <div className="mt-6 flex items-center justify-between text-[11px] text-slate-500 pt-4 border-t border-slate-800/80">
           <span className="flex items-center gap-1">

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Database, LogOut, RefreshCw, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Database, LogOut, RefreshCw, FileText, Shield } from 'lucide-react';
 import { clearAuthToken } from '../api/client';
 import { HashBadge } from './HashBadge';
 import { Dataset } from '../types';
@@ -67,6 +68,15 @@ export const Header: React.FC<HeaderProps> = ({
             {isLoadingDemo ? 'Loading Demo...' : 'Load Enterprise Demo'}
           </button>
         )}
+
+        <Link
+          to="/"
+          title="ShieldSense Landing Page"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-medium transition-colors"
+        >
+          <Shield className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Landing Page</span>
+        </Link>
 
         <button
           onClick={() => window.open('/docs', '_blank')}

@@ -34,11 +34,13 @@ export async function apiRequest<T = any>(
   });
 
   if (response.status === 401) {
-    clearAuthToken();
-    if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login';
+    if (!endpoint.includes('/auth/login')) {
+      clearAuthToken();
+      if (!window.location.pathname.includes('/login') && window.location.pathname !== '/') {
+        window.location.href = '/login';
+      }
     }
-    throw new Error('Unauthorized');
+    throw new Error('Invalid email or password');
   }
 
   if (!response.ok) {

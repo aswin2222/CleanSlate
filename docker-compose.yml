@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cleanslate-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://cleanslate:cleanslate_secure_2026@postgres:5432/cleanslate
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=prod_super_secure_jwt_secret_token_cleanslate_2026_enterprise
+      - DATA_ENCRYPTION_KEY=MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+      - MAX_UPLOAD_BYTES=52428800
+      - PROMETHEUS_METRICS=true
+    volumes:
+      - storage_data:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cleanslate-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cleanslate-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - cleanslate-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cleanslate-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cleanslate
+      POSTGRES_PASSWORD: cleanslate_secure_2026
+      POSTGRES_DB: cleanslate
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleanslate -d cleanslate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cleanslate-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cleanslate-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cleanslate-network
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: cleanslate-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - cleanslate-network
+
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: cleanslate-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - cleanslate-network
+
+volumes:
+  pgdata:
+  redisdata:
+  storage_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  cleanslate-network:
+    driver: bridge

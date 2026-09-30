@@ -1,0 +1,38 @@
+groups:
+  - name: cleanslate_alerts
+    rules:
+      - alert: CleanSlateBackendDown
+        expr: up{job="cleanslate-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "CleanSlate API backend instance is down"
+          description: "Backend container has failed health probes for >30s."
+
+      - alert: HighHttpErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate detected"
+          description: "CleanSlate error rate is above 5% over the last 5 minutes."
+
+      - alert: SlowCleaningPipeline
+        expr: histogram_quantile(0.95, sum(rate(cleanslate_pipeline_duration_seconds_bucket[5m])) by (le)) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile pipeline duration exceeds 30 seconds"
+          description: "Cleaning runs are experiencing latency spikes."
+
+      - alert: HighInformationLossRun
+        expr: cleanslate_loss_score > 40
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cleaning run has predicted information loss above 40%"
+          description: "A pipeline requires manual human-in-the-loop review."

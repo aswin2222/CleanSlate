@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cleanslate-config
+  namespace: cleanslate
+  labels:
+    app.kubernetes.io/name: cleanslate
+    app.kubernetes.io/part-of: cleanslate-platform
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  MAX_UPLOAD_BYTES: "52428800"
+  MAX_COLUMNS: "200"
+  SPARSE_THRESHOLD: "0.90"
+  PROMETHEUS_METRICS: "true"
+  PORT: "8000"

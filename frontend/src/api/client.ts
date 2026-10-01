@@ -77,8 +77,8 @@ export async function downloadFile(endpoint: string, fallbackFilename?: string):
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const url = getApiUrl(endpoint);
-  const response = await fetch(url, {
+  const fetchUrl = getApiUrl(endpoint);
+  const response = await fetch(fetchUrl, {
     method: 'GET',
     headers,
   });
@@ -104,13 +104,13 @@ export async function downloadFile(endpoint: string, fallbackFilename?: string):
   }
 
   const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
+  const downloadUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
+  a.href = downloadUrl;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  window.URL.revokeObjectURL(url);
+  window.URL.revokeObjectURL(downloadUrl);
   document.body.removeChild(a);
 }
 

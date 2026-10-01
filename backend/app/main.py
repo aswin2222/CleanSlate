@@ -93,6 +93,19 @@ async def prometheus_metrics_middleware(request: Request, call_next):
     return response
 
 
+@app.get("/", tags=["Info"])
+def root():
+    """API root — returns service info."""
+    return {
+        "service": "CleanSlate / TITAN API",
+        "version": "1.0.0",
+        "status": "online",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/health",
+    }
+
+
 @app.get("/metrics", tags=["Observability"])
 def prometheus_metrics() -> Response:
     """Prometheus metrics scrape endpoint."""

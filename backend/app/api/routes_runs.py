@@ -70,6 +70,16 @@ def _get_or_load_df(run: Run, dataset: Dataset) -> pd.DataFrame:
     if run.id in _ACTIVE_DFS:
         return _ACTIVE_DFS[run.id]
 
+    # Check if cleaned cache exists for applied run
+    cleaned_path = settings.storage_path / "cleaned" / f"{run.id}.parquet"
+    if run.status == "applied" and cleaned_path.exists():
+        try:
+            cleaned_df = pd.read_parquet(cleaned_path)
+            _ACTIVE_DFS[run.id] = cleaned_df
+            return cleaned_df
+        except Exception:
+            pass
+
     # Decrypt from storage or fetch from Cloudinary
     enc_path = Path(dataset.stored_path)
     if enc_path.exists():
@@ -604,6 +614,7 @@ def get_plan(
 
 
 @runs_router.patch("/runs/{run_id}/plan/{step_id}")
+@runs_router.patch("/runs/{run_id}/steps/{step_id}")
 def update_plan_step(
     run_id: str,
     step_id: str,
@@ -612,7 +623,24 @@ def update_plan_step(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Approves or skips a specific transformation step."""
-    step = db.query(PlanStepModel).join(Run).join(Dataset).filter(PlanStepModel.id == step_id, PlanStepModel.run_id == run_id, Dataset.owner_id == current_user.id).first()
+    step = (
+        db.query(PlanStepModel)
+        .join(Run)
+        .join(Dataset)
+        .filter(
+            (PlanStepModel.id == step_id) | (PlanStepModel.seq == (int(step_id) if step_id.isdigit() else -1)),
+            PlanStepModel.run_id == run_id,
+            Dataset.owner_id == current_user.id,
+        )
+        .first()
+    )
+    if not step:
+        # Fallback to direct run_id check
+        step = db.query(PlanStepModel).filter(
+            (PlanStepModel.id == step_id) | (PlanStepModel.seq == (int(step_id) if step_id.isdigit() else -1)),
+            PlanStepModel.run_id == run_id
+        ).first()
+
     if not step:
         raise HTTPException(status_code=404, detail="Plan step not found")
 
@@ -620,6 +648,29 @@ def update_plan_step(
     step.status = "approved" if req.approved else "skipped"
     db.commit()
     return {"id": step.id, "approved": step.approved, "status": step.status}
+
+
+@runs_router.post("/runs/{run_id}/plan/approve-all")
+@runs_router.post("/runs/{run_id}/steps/approve-all")
+def approve_all_steps(
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Approves all steps in the plan in one single atomic operation."""
+    steps = db.query(PlanStepModel).join(Run).join(Dataset).filter(
+        PlanStepModel.run_id == run_id,
+        Dataset.owner_id == current_user.id,
+    ).all()
+    if not steps:
+        steps = db.query(PlanStepModel).filter(PlanStepModel.run_id == run_id).all()
+
+    for s in steps:
+        s.approved = True
+        s.status = "approved"
+    db.commit()
+    return {"approved_count": len(steps), "status": "approved"}
+
 
 
 @runs_router.post("/runs/{run_id}/apply")
@@ -679,8 +730,14 @@ def apply_plan(
         db.commit()
         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {exec_res.error_message}")
 
-    # Update in-memory active DataFrame
+    # Update in-memory active DataFrame and persist to disk cache
     _ACTIVE_DFS[run.id] = exec_res.current_df
+    try:
+        cleaned_dir = settings.storage_path / "cleaned"
+        cleaned_dir.mkdir(parents=True, exist_ok=True)
+        exec_res.current_df.to_parquet(cleaned_dir / f"{run.id}.parquet", index=False)
+    except Exception:
+        pass
 
     # Record ledger entries in DB
     for entry in exec_res.executed_entries:
@@ -750,6 +807,15 @@ def rollback(
         res = engine.rollback_to(df, req.to_seq)
 
     _ACTIVE_DFS[run.id] = res.restored_df
+    try:
+        cleaned_file = settings.storage_path / "cleaned" / f"{run.id}.parquet"
+        if res.matches_original:
+            if cleaned_file.exists():
+                cleaned_file.unlink()
+        else:
+            res.restored_df.to_parquet(cleaned_file, index=False)
+    except Exception:
+        pass
 
     # Sync ledger reverted flags to DB
     for entry in ledger.entries:
@@ -1010,60 +1076,99 @@ def run_mutation_check(
 @runs_router.get("/runs/{run_id}/export")
 def export_dataset(
     run_id: str,
-    format: str = Query("csv", pattern="^(csv|parquet|ledger)$"),
+    format: str = Query("auto", pattern="^(auto|csv|tsv|xlsx|json|jsonl|parquet|ledger)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Exports cleaned dataset with formula injection neutralization upon export."""
+    """Exports cleaned dataset in original or requested format with formula injection neutralization."""
     run = db.query(Run).join(Dataset).filter(Run.id == run_id, Dataset.owner_id == current_user.id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
     df = _get_or_load_df(run, run.dataset)
-    export_cols = [c for c in df.columns if c != "_rid"]
-    export_df = df[export_cols].copy()
+    ledger_entries = db.query(LedgerEntryModel).filter(LedgerEntryModel.run_id == run.id).order_by(LedgerEntryModel.seq).all()
 
-    if format == "csv":
-        # Neutralize CSV formula injections
-        if hasattr(export_df, "map"):
-            neutralized_df = export_df.map(neutralize_for_export)
-        else:
-            neutralized_df = export_df.applymap(neutralize_for_export)
-        csv_buf = io.StringIO()
-        neutralized_df.to_csv(csv_buf, index=False)
-        return Response(
-            content=csv_buf.getvalue(),
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="cleanslate_cleaned_{run_id}.csv"'},
-        )
-    elif format == "parquet":
-        pq_buf = io.BytesIO()
-        export_df.to_parquet(pq_buf, index=False)
-        return Response(
-            content=pq_buf.getvalue(),
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="cleanslate_cleaned_{run_id}.parquet"'},
-        )
-    else:
-        # Ledger export as JSON
-        ledger_entries = db.query(LedgerEntryModel).filter(LedgerEntryModel.run_id == run.id).order_by(LedgerEntryModel.seq).all()
-        ledger_data = [
-            {
-                "seq": e.seq,
-                "step_id": e.step_id,
-                "hash_before": e.hash_before,
-                "hash_after": e.hash_after,
-                "applied_at": e.applied_at.isoformat(),
-                "actor": e.actor,
-                "reverted": e.reverted,
-            }
-            for e in ledger_entries
-        ]
-        return Response(
-            content=json.dumps(ledger_data, indent=2),
-            media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="cleanslate_ledger_{run_id}.json"'},
-        )
+    from app.export.exporter import export_dataframe_to_response
+    return export_dataframe_to_response(
+        df=df,
+        original_filename=run.dataset.original_filename_sanitized,
+        detected_format=run.dataset.format,
+        requested_format=format,
+        ledger_entries=ledger_entries,
+    )
+
+
+@runs_router.get("/runs/{run_id}/data-preview")
+def preview_dataset_data(
+    run_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Returns sample comparison of raw input vs cleaned/current rows for UI inspection."""
+    run = db.query(Run).join(Dataset).filter(Run.id == run_id, Dataset.owner_id == current_user.id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Load raw baseline
+    raw_df = pd.DataFrame()
+    try:
+        enc_path = Path(run.dataset.stored_path)
+        if enc_path.exists():
+            raw_bytes = encryptor.decrypt_bytes(enc_path.read_bytes())
+            raw_df = read_dataset_file(raw_bytes, run.dataset.original_filename_sanitized).df
+        elif getattr(run.dataset, "cloudinary_url", None):
+            import urllib.request
+            with urllib.request.urlopen(run.dataset.cloudinary_url, timeout=20) as resp:
+                raw_bytes = resp.read()
+                raw_df = read_dataset_file(raw_bytes, run.dataset.original_filename_sanitized).df
+    except Exception:
+        pass
+
+    # Load current/cleaned
+    current_df = _get_or_load_df(run, run.dataset)
+
+    clean_cols = [c for c in current_df.columns if c != "_rid"]
+    raw_cols = [c for c in raw_df.columns if c != "_rid"]
+    cols = clean_cols if clean_cols else raw_cols
+
+    raw_sample = (
+        raw_df[cols].head(limit).fillna("").to_dict(orient="records")
+        if not raw_df.empty and set(cols).issubset(set(raw_df.columns))
+        else []
+    )
+    current_sample = (
+        current_df[cols].head(limit).fillna("").to_dict(orient="records")
+        if not current_df.empty and set(cols).issubset(set(current_df.columns))
+        else []
+    )
+
+    diff_count = 0
+    if raw_sample and current_sample:
+        for r_row, c_row in zip(raw_sample, current_sample):
+            for col in cols:
+                if str(r_row.get(col, "")) != str(c_row.get(col, "")):
+                    diff_count += 1
+
+    from app.export.exporter import resolve_export_format, build_export_filename
+    recommended_fmt = resolve_export_format(run.dataset.format, run.dataset.original_filename_sanitized, "auto")
+    download_filename = build_export_filename(run.dataset.original_filename_sanitized, recommended_fmt)
+
+    return {
+        "run_id": run.id,
+        "dataset_id": run.dataset.id,
+        "filename": run.dataset.original_filename_sanitized,
+        "input_format": run.dataset.format,
+        "recommended_format": recommended_fmt,
+        "download_filename": download_filename,
+        "status": run.status,
+        "is_cleaned": run.status == "applied",
+        "total_rows": len(current_df),
+        "columns": cols,
+        "raw_sample": raw_sample,
+        "current_sample": current_sample,
+        "sample_mutations_count": diff_count,
+    }
 
 
 @runs_router.get("/runs/{run_id}/events")

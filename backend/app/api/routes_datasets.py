@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -261,3 +261,62 @@ def delete_dataset(
 
     db.delete(dataset)
     db.commit()
+
+
+@datasets_router.get("/{dataset_id}/export")
+def export_dataset_by_id(
+    dataset_id: str,
+    format: str = Query("auto", pattern="^(auto|csv|tsv|xlsx|json|jsonl|parquet|ledger)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Exports dataset in its latest cleaned state (or original state if no clean run exists)
+    in the original input format or a user-selected format.
+    """
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.owner_id == current_user.id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error_code": "DATASET_NOT_FOUND", "message": "Dataset not found"},
+        )
+
+    from app.db.models import Run, LedgerEntryModel
+    from app.export.exporter import export_dataframe_to_response
+    from app.api.routes_runs import _get_or_load_df
+
+    # Check for latest applied run, or most recent run
+    applied_run = (
+        db.query(Run)
+        .filter(Run.dataset_id == dataset.id, Run.status == "applied")
+        .order_by(Run.created_at.desc())
+        .first()
+    )
+    target_run = applied_run or db.query(Run).filter(Run.dataset_id == dataset.id).order_by(Run.created_at.desc()).first()
+
+    ledger_entries = []
+    if target_run:
+        df = _get_or_load_df(target_run, dataset)
+        ledger_entries = db.query(LedgerEntryModel).filter(LedgerEntryModel.run_id == target_run.id).order_by(LedgerEntryModel.seq).all()
+    else:
+        # Load raw from disk or Cloudinary
+        enc_path = Path(dataset.stored_path)
+        if enc_path.exists():
+            raw_bytes = encryptor.decrypt_bytes(enc_path.read_bytes())
+        elif getattr(dataset, "cloudinary_url", None):
+            import urllib.request
+            with urllib.request.urlopen(dataset.cloudinary_url, timeout=20) as resp:
+                raw_bytes = resp.read()
+        else:
+            raise HTTPException(status_code=404, detail="Dataset file not found")
+        ingest_res = read_dataset_file(raw_bytes, dataset.original_filename_sanitized)
+        df = ingest_res.df
+
+    return export_dataframe_to_response(
+        df=df,
+        original_filename=dataset.original_filename_sanitized,
+        detected_format=dataset.format,
+        requested_format=format,
+        ledger_entries=ledger_entries,
+    )
+

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiRequest } from '../api/client';
 import { Dataset, UploadGuardResponse } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
@@ -13,6 +14,12 @@ import {
   ExternalLink,
   Cloud,
   Flame,
+  Sparkles,
+  Zap,
+  ArrowRight,
+  FileSpreadsheet,
+  FileText,
+  Binary,
 } from 'lucide-react';
 
 interface UploadProps {
@@ -29,6 +36,7 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
   const [uploadResult, setUploadResult] = useState<UploadGuardResponse | null>(null);
   const [cloudinaryUrl, setCloudinaryUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -50,7 +58,7 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
     setUploadResult(null);
     setCloudinaryUrl(null);
     setUploadProgress(15);
-    setUploadStage('Uploading to Cloudinary (bgrvz383)...');
+    setUploadStage('Ingesting asset to Cloudinary (bgrvz383)...');
 
     try {
       // 1. Upload to Cloudinary directly with preset TITAN-project
@@ -66,7 +74,7 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
         console.warn('Cloudinary direct upload note:', cloudErr.message);
       }
 
-      // 2. Ingest into CleanSlate backend engine
+      // 2. Ingest into TITAN backend engine
       setUploadStage('Running Guardrails & SHA-256 Hash Verification...');
       setUploadProgress(75);
       const formData = new FormData();
@@ -123,156 +131,226 @@ export const Upload: React.FC<UploadProps> = ({ onDatasetLoaded }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-8 relative">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Upload Dataset</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Files are stored in Cloudinary, synced to Firebase Firestore, and secured by CleanSlate.
+          <span className="px-3 py-1 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-neutral-900 text-neutral-300 border border-neutral-800">
+            Enterprise Ingestion Pipeline
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight uppercase mt-1">
+            Upload & Profile Dataset
+          </h1>
+          <p className="text-xs text-neutral-400 mt-1">
+            Files are stored in Cloudinary, synced to Firebase Firestore, and secured by TITAN guardrails.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-[11px] font-medium">
-            <Cloud className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-mono">
+            <Cloud className="w-3.5 h-3.5 text-neutral-400" />
             <span>Cloudinary: bgrvz383</span>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-medium">
-            <Flame className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-mono">
+            <Flame className="w-3.5 h-3.5 text-neutral-400" />
             <span>Firestore: titan-d57bf</span>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center gap-3"
+        >
+          <AlertTriangle className="w-5 h-5 shrink-0 text-red-400" />
           <span>{error}</span>
-        </div>
+        </motion.div>
       )}
 
       {/* Upload Guard Summary Banner if completed */}
       {uploadResult && uploadResult.dataset && (
-        <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-slate-200 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Ingested & Secured Successfully</span>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="p-7 rounded-3xl bg-neutral-950 border border-neutral-800 text-neutral-200 space-y-4 shadow-2xl"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  Ingested & Guardrails Passed
+                </h3>
+                <p className="text-xs text-neutral-400">Canonical SHA-256 generated and verified.</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {(cloudinaryUrl || uploadResult.dataset.cloudinary_url) && (
                 <a
                   href={cloudinaryUrl || uploadResult.dataset.cloudinary_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
+                  className="px-4 py-2 rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-all"
                 >
-                  <Cloud className="w-3.5 h-3.5" />
+                  <Cloud className="w-3.5 h-3.5 text-neutral-400" />
                   <span>Cloudinary URL</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/profile')}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors"
+                className="px-5 py-2 rounded-full bg-white text-black font-semibold text-xs transition-all cursor-pointer flex items-center gap-1.5 hover:bg-neutral-200 shadow-md"
               >
-                Inspect Profile →
-              </button>
+                <span>Inspect Profile</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </motion.button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 text-xs">
-            <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-slate-400">Rows Ingested</div>
-              <div className="font-bold text-white font-mono text-sm">{uploadResult.dataset.rows.toLocaleString()}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-2 text-xs">
+            <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+              <div className="text-neutral-400 text-[10px] uppercase font-bold">Rows Ingested</div>
+              <div className="font-extrabold text-white font-mono text-base mt-0.5">
+                {uploadResult.dataset.rows.toLocaleString()}
+              </div>
             </div>
-            <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-slate-400">Null Bytes Stripped</div>
-              <div className="font-bold text-emerald-400 font-mono text-sm">{uploadResult.null_bytes_stripped}</div>
+            <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+              <div className="text-neutral-400 text-[10px] uppercase font-bold">Null Bytes Stripped</div>
+              <div className="font-extrabold text-white font-mono text-base mt-0.5">
+                {uploadResult.null_bytes_stripped}
+              </div>
             </div>
-            <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-slate-400">Formula Injections</div>
-              <div className="font-bold text-amber-400 font-mono text-sm">{uploadResult.formula_injection_cells_detected} neutralized</div>
+            <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+              <div className="text-neutral-400 text-[10px] uppercase font-bold">Formula Injections</div>
+              <div className="font-extrabold text-white font-mono text-base mt-0.5">
+                {uploadResult.formula_injection_cells_detected} <span className="text-xs font-normal text-neutral-400">neutralized</span>
+              </div>
             </div>
-            <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-slate-400">Storage & DB</div>
-              <div className="font-bold text-cyan-400 font-mono text-xs truncate">Cloudinary + Firestore</div>
+            <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+              <div className="text-neutral-400 text-[10px] uppercase font-bold">Storage & DB</div>
+              <div className="font-extrabold text-white font-mono text-xs mt-1 truncate">
+                Cloudinary + Firestore
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Main Upload Form */}
-      <form onSubmit={handleUpload} className="p-8 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-6">
-        <div className="border-2 border-dashed border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-8 text-center transition-colors relative">
+      {/* Main Form & Drag/Drop Card */}
+      <form onSubmit={handleUpload} className="space-y-6">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragOver(false);
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              const dropped = e.dataTransfer.files[0];
+              setFile(dropped);
+              const ext = dropped.name.split('.').pop()?.toLowerCase();
+              if (ext === 'json') setFormat('json');
+              else if (ext === 'parquet') setFormat('parquet');
+              else if (ext === 'xlsx' || ext === 'xls') setFormat('excel');
+              else setFormat('csv');
+            }
+          }}
+          className={`p-10 rounded-3xl border-2 border-dashed transition-all duration-300 relative flex flex-col items-center justify-center text-center cursor-pointer ${
+            isDragOver
+              ? 'border-white bg-neutral-900 scale-[1.01]'
+              : file
+              ? 'border-neutral-700 bg-neutral-950/80 shadow-xl'
+              : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700 hover:bg-neutral-900/40 shadow-xl'
+          }`}
+        >
           <input
             type="file"
             onChange={handleFileChange}
-            accept=".csv,.tsv,.json,.parquet,.xlsx,.xls"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            accept=".csv,.xlsx,.xls,.tsv,.json,.parquet"
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
           />
-          <UploadCloud className="w-12 h-12 text-indigo-400 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-white">
-            {file ? file.name : 'Click to select or drag and drop dataset file'}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            {file
-              ? `${(file.size / 1024).toFixed(1)} KB selected`
-              : 'CSV, JSON Lines, Parquet, or Excel format'}
-          </p>
+
+          <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white mb-4 shadow-inner">
+            <UploadCloud className="w-8 h-8 text-neutral-300" />
+          </div>
+
+          {file ? (
+            <div className="space-y-1 z-20">
+              <div className="text-white font-semibold text-base flex items-center gap-2 justify-center">
+                <span>{file.name}</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-neutral-900 text-neutral-200 border border-neutral-800">
+                  {(file.size / 1024).toFixed(1)} KB
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400">Click or drag a new file to replace</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="text-white font-semibold text-base tracking-tight">
+                Drop your raw enterprise dataset here
+              </div>
+              <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                Supports CSV, Excel (XLSX/XLS), JSON, TSV, and Parquet. Automatically vaulted in Cloudinary.
+              </p>
+            </div>
+          )}
+
+          {/* Format Badges */}
+          <div className="flex items-center gap-2 mt-6 flex-wrap justify-center">
+            {['CSV', 'Excel (XLSX)', 'JSON', 'Parquet', 'TSV'].map((f) => (
+              <span
+                key={f}
+                className="px-3 py-1 rounded-full text-[11px] font-mono bg-neutral-900 text-neutral-400 border border-neutral-800"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
         </div>
 
+        {/* Progress Bar during upload */}
         {uploading && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>{uploadStage}</span>
-              <span>{uploadProgress}%</span>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-5 rounded-3xl bg-neutral-950 border border-neutral-800 space-y-2.5"
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-white flex items-center gap-2">
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {uploadStage}
+              </span>
+              <span className="font-mono text-white font-bold">{uploadProgress}%</span>
             </div>
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
+            <div className="w-full h-2 bg-neutral-900 rounded-full overflow-hidden border border-neutral-800">
+              <motion.div
+                className="h-full bg-white"
+                animate={{ width: `${uploadProgress}%` }}
+                transition={{ duration: 0.3 }}
+              />
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-              Data Format
-            </label>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="csv">CSV (Auto-detect comma, semicolon, tab)</option>
-              <option value="json">JSON / JSON-Lines</option>
-              <option value="parquet">Apache Parquet</option>
-              <option value="excel">Microsoft Excel (.xlsx)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-              Storage & Database
-            </label>
-            <div className="flex items-center gap-2 h-9 px-3 bg-slate-800/60 border border-slate-700/60 rounded-lg text-xs text-emerald-400 font-mono">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Cloudinary (bgrvz383) + Firestore Live</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end pt-4 border-t border-slate-800">
-          <button
+        {/* Upload Action Button */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={!file || uploading}
-            className="px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-8 py-3 rounded-full bg-white text-black font-semibold text-xs flex items-center gap-2 hover:bg-neutral-200 transition-all shadow-md cursor-pointer disabled:opacity-50"
           >
-            <FileCode className="w-4 h-4" />
-            {uploading ? 'Uploading to Cloudinary & Securing...' : 'Upload & Clean Dataset'}
-          </button>
+            <Zap className="w-4 h-4 fill-black" />
+            <span>{uploading ? 'Ingesting Dataset...' : 'Begin Ingestion & Profile'}</span>
+          </motion.button>
         </div>
       </form>
     </div>

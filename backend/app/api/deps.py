@@ -1,8 +1,8 @@
 """FastAPI dependencies for authentication, database session, and role enforcement."""
 from __future__ import annotations
 
-from typing import Callable, Generator
-from fastapi import Depends, HTTPException, status
+from typing import Callable, Generator, Optional
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -14,18 +14,25 @@ security_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    auth_header: HTTPAuthorizationCredentials = Depends(security_scheme),
+    auth_header: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    token: Optional[str] = Query(None, description="Optional access token query parameter"),
     db: Session = Depends(get_db),
 ) -> User:
-    """Extracts and verifies JWT token from Bearer header, returning User instance."""
-    if not auth_header or not auth_header.credentials:
+    """Extracts and verifies JWT token from Bearer header or query param, returning User instance."""
+    raw_token = None
+    if auth_header and auth_header.credentials:
+        raw_token = auth_header.credentials
+    elif token:
+        raw_token = token
+
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error_code": "AUTH_REQUIRED", "message": "Missing authentication token"},
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_token(auth_header.credentials)
+    payload = decode_token(raw_token)
     if not payload or payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

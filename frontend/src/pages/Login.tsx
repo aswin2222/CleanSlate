@@ -5,8 +5,8 @@ import { Sparkles, ArrowRight, ShieldCheck, Lock, Shield } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@cleanslate.local');
-  const [password, setPassword] = useState('cleanslate123!');
+  const [email, setEmail] = useState('admin@titan.local');
+  const [password, setPassword] = useState('titan123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,27 +45,35 @@ export const Login: React.FC = () => {
   };
 
   const handleQuickDemo = async () => {
-    setEmail('admin@cleanslate.local');
-    setPassword('cleanslate123!');
+    setEmail('admin@titan.local');
+    setPassword('titan123!');
     setLoading(true);
     setError(null);
     try {
       try {
         const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'cleanslate123!' }),
+          body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!' }),
         });
         setAuthToken(resp.access_token);
       } catch {
-        await apiRequest('/api/auth/register', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!', role: 'admin' }),
-        });
-        const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!' }),
-        });
-        setAuthToken(resp.access_token);
+        try {
+          const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'cleanslate123!' }),
+          });
+          setAuthToken(resp.access_token);
+        } catch {
+          await apiRequest('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!', role: 'admin' }),
+          });
+          const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!' }),
+          });
+          setAuthToken(resp.access_token);
+        }
       }
       navigate('/dashboard');
     } catch (err: any) {
@@ -87,7 +95,7 @@ export const Login: React.FC = () => {
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">CleanSlate</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">TITAN</h1>
             <p className="text-xs text-slate-400">Autonomous Enterprise Data Cleaning</p>
           </div>
         </div>
@@ -162,10 +170,10 @@ export const Login: React.FC = () => {
         <div className="mt-4 text-center">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors"
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>← Return to ShieldSense Landing Page</span>
+            <span>← Return to TITAN Landing Page</span>
           </Link>
         </div>
 

@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Database, LogOut, FileText, Shield, Cloud, Flame } from 'lucide-react';
+import { Database, LogOut, FileText, Shield, ChevronDown } from 'lucide-react';
 import { clearAuthToken } from '../api/client';
-import { HashBadge } from './HashBadge';
 import { Dataset } from '../types';
 
 interface HeaderProps {
@@ -24,17 +23,20 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 flex items-center justify-between shrink-0 z-10">
-      <div className="flex items-center gap-4">
-        <h2 className="text-lg font-bold text-white tracking-tight">{title}</h2>
+    <header className="h-16 bg-black/90 backdrop-blur-xl border-b border-neutral-800/80 px-6 flex items-center justify-between shrink-0 z-20 relative">
+      {/* Left: Clean Breadcrumb & Dataset Selector */}
+      <div className="flex items-center gap-3 min-w-0">
+        <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap shrink-0">
+          {title}
+        </h2>
 
         {selectedDataset && (
-          <div className="flex items-center gap-2">
-            <span className="text-slate-600">/</span>
-            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1 text-xs">
-              <Database className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-neutral-600 font-light select-none">/</span>
+            <div className="relative flex items-center gap-2 bg-neutral-900/90 border border-neutral-800 hover:border-neutral-700 rounded-full px-3 py-1.5 text-xs transition-colors shadow-sm group min-w-0">
+              <Database className="w-3.5 h-3.5 text-white shrink-0 group-hover:scale-105 transition-transform" />
               <select
-                className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-neutral-200 font-medium focus:outline-none cursor-pointer pr-5 appearance-none text-xs truncate max-w-[180px] sm:max-w-[260px] md:max-w-[340px]"
                 value={selectedDataset.id}
                 onChange={(e) => {
                   const ds = datasets.find((d) => d.id === e.target.value);
@@ -42,50 +44,43 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
               >
                 {datasets.map((d) => (
-                  <option key={d.id} value={d.id} className="bg-slate-900 text-slate-200">
+                  <option key={d.id} value={d.id} className="bg-neutral-950 text-neutral-200 py-1">
                     {d.filename} ({d.rows} rows, {d.cols} cols)
                   </option>
                 ))}
               </select>
+              <ChevronDown className="w-3 h-3 text-neutral-400 pointer-events-none absolute right-2.5" />
             </div>
-            <HashBadge originalHash={selectedDataset.canonical_hash} size="sm" />
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden lg:flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-[11px] font-mono">
-            <Cloud className="w-3 h-3" /> Cloudinary: bgrvz383
-          </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono">
-            <Flame className="w-3 h-3" /> Firestore: titan-d57bf
-          </span>
-        </div>
-
+      {/* Right: Clean, Uncluttered Utility Actions */}
+      <div className="flex items-center gap-2.5 shrink-0">
         <Link
           to="/"
-          title="ShieldSense Landing Page"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-medium transition-colors"
+          title="Return to Landing Page"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-medium transition-colors"
         >
-          <Shield className="w-3.5 h-3.5" />
+          <Shield className="w-3.5 h-3.5 text-white" />
           <span className="hidden sm:inline">Landing Page</span>
         </Link>
 
         <button
           onClick={() => window.open('http://127.0.0.1:8000/docs', '_blank')}
           title="Open API Docs (Swagger)"
-          className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+          className="p-1.5 px-2.5 rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-xs"
         >
-          <FileText className="w-4 h-4" />
+          <FileText className="w-3.5 h-3.5 text-white" />
+          <span className="hidden md:inline">API</span>
         </button>
 
         <button
           onClick={handleLogout}
           title="Sign Out"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700/60 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-medium transition-colors cursor-pointer"
         >
-          <LogOut className="w-3.5 h-3.5" />
+          <LogOut className="w-3.5 h-3.5 text-white" />
           <span>Logout</span>
         </button>
       </div>

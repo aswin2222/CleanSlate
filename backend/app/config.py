@@ -32,7 +32,7 @@ _load_env()
 
 class Settings:
     def __init__(self) -> None:
-        self.PROJECT_NAME: str = os.getenv("PROJECT_NAME", "CleanSlate")
+        self.PROJECT_NAME: str = os.getenv("PROJECT_NAME", "TITAN")
         self.ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
         self.PORT: int = int(os.getenv("PORT", "8000"))
         self.DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
@@ -61,6 +61,10 @@ class Settings:
         default_model = "openai/gpt-oss-120b" if self.LLM_PROVIDER == "groq" else "heuristic"
         self.LLM_MODEL: str = os.getenv("LLM_MODEL", default_model)
         self.LLM_TIMEOUT_S: int = int(os.getenv("LLM_TIMEOUT_S", "30"))
+
+        # Resend Email Automation
+        self.RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+        self.RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
         # Storage & Upload Guardrails
         self.STORAGE_DIR: str = os.getenv("STORAGE_DIR", "./storage")

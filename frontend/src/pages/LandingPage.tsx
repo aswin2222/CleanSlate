@@ -251,7 +251,7 @@ export const LiveThreatScannerModal: React.FC<ScannerModalProps> = ({ isOpen, on
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-semibold text-white tracking-tight">
-                    CleanSlate Data Quality Scanner
+                    TITAN Data Quality Scanner
                   </h3>
                   <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50 font-mono">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -531,7 +531,7 @@ export const LiveThreatScannerModal: React.FC<ScannerModalProps> = ({ isOpen, on
               <div>
                 <h5 className="text-xs font-semibold text-white">Ready to Clean & Safeguard Your Datasets?</h5>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
-                  Launch the CleanSlate autonomous pipeline to profile, infer constraints, and execute 100% reversible repairs.
+                  Launch the TITAN autonomous pipeline to profile, infer constraints, and execute 100% reversible repairs.
                 </p>
               </div>
               <button
@@ -541,7 +541,7 @@ export const LiveThreatScannerModal: React.FC<ScannerModalProps> = ({ isOpen, on
                 }}
                 className="bg-emerald-400 text-black px-4 py-2 rounded-xl text-xs font-semibold hover:bg-emerald-300 transition-colors inline-flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md"
               >
-                <span>Launch CleanSlate</span>
+                <span>Launch TITAN</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -562,8 +562,8 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
-  const [email, setEmail] = useState('admin@cleanslate.local');
-  const [password, setPassword] = useState('cleanslate123!');
+  const [email, setEmail] = useState('admin@titan.local');
+  const [password, setPassword] = useState('titan123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -606,7 +606,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
       try {
         const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!' }),
+          body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!' }),
         });
         setAuthToken(resp.access_token);
       } catch {
@@ -619,11 +619,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         } catch {
           await apiRequest('/api/auth/register', {
             method: 'POST',
-            body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!', role: 'admin' }),
+            body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!', role: 'admin' }),
           });
           const resp = await apiRequest<{ access_token: string; token_type: string }>('/api/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ email: 'admin@cleanslate.local', password: 'CleanSlate2026!' }),
+            body: JSON.stringify({ email: 'admin@titan.local', password: 'titan123!' }),
           });
           setAuthToken(resp.access_token);
         }
@@ -672,7 +672,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                 <Shield className="w-5 h-5 fill-emerald-400 stroke-transparent" />
               </div>
               <h3 className="text-lg font-semibold text-white tracking-tight">
-                Sign in to CleanSlate
+                Sign in to TITAN
               </h3>
               <p className="text-xs text-neutral-400 leading-relaxed">
                 Access reversible ledgers, autonomous profiling, and test-driven cleaning pipelines.
@@ -698,7 +698,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@cleanslate.local"
+                  placeholder="admin@titan.local"
                   className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-600 transition-colors"
                 />
               </div>
@@ -706,7 +706,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[11px] font-medium text-neutral-300">Password</label>
-                  <span className="text-[10px] text-neutral-500">Default: cleanslate123!</span>
+                  <span className="text-[10px] text-neutral-500">Default: titan123!</span>
                 </div>
                 <input
                   type="password"
@@ -754,17 +754,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
 };
 
 // ==========================================
-// 3. Main CleanSlate Landing Page Component
+// 3. Main TITAN Landing Page Component
 // ==========================================
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Navigation and Modal states
-  const [activeTab, setActiveTab] = useState<'platform' | 'solutions' | 'company' | 'support'>('platform');
+  const [activeTab, setActiveTab] = useState<'platform' | 'solutions' | 'company'>('platform');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [codeLanguage, setCodeLanguage] = useState<'typescript' | 'python'>('typescript');
-  const [copiedCode, setCopiedCode] = useState(false);
 
   // Mouse tracking for dynamic cursor glow and parallax
   const mouseX = useMotionValue(-100);
@@ -784,11 +782,9 @@ export const LandingPage: React.FC = () => {
       const platform = document.getElementById('platform');
       const solutions = document.getElementById('solutions');
       const company = document.getElementById('company');
-      const support = document.getElementById('support');
       const offset = 220;
 
-      if (support && scrollY >= support.offsetTop - offset) setActiveTab('support');
-      else if (company && scrollY >= company.offsetTop - offset) setActiveTab('company');
+      if (company && scrollY >= company.offsetTop - offset) setActiveTab('company');
       else if (solutions && scrollY >= solutions.offsetTop - offset) setActiveTab('solutions');
       else if (platform && scrollY >= platform.offsetTop - offset) setActiveTab('platform');
       else setActiveTab('platform');
@@ -830,12 +826,6 @@ export const LandingPage: React.FC = () => {
       document.documentElement.removeEventListener('mouseenter', handleMouseEnter);
     };
   }, [mouseX, mouseY]);
-
-  const handleCopyCode = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
 
   const handleEnterWorkspace = () => {
     if (!getAuthToken()) {
@@ -912,7 +902,7 @@ export const LandingPage: React.FC = () => {
             <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
               <Shield className="w-3 h-3 fill-emerald-400 stroke-transparent" />
             </div>
-            <span className="text-white text-xs font-semibold tracking-tight">CleanSlate</span>
+            <span className="text-white text-xs font-semibold tracking-tight">TITAN</span>
           </motion.a>
 
           {/* Navigation Tabs Pill with Live Scanner Trigger */}
@@ -941,14 +931,6 @@ export const LandingPage: React.FC = () => {
                 }`}
               >
                 company
-              </a>
-              <a
-                href="#support"
-                className={`px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'support' ? 'text-white bg-neutral-800/80' : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                support
               </a>
               <button
                 onClick={() => setIsScannerOpen(true)}
@@ -980,7 +962,7 @@ export const LandingPage: React.FC = () => {
               className="inline-flex items-center gap-2 bg-white text-black text-xs font-semibold rounded-full px-5 py-2.5 hover:bg-neutral-200 transition-all cursor-pointer shadow-md"
             >
               <Zap className="w-3.5 h-3.5 fill-black" />
-              <span>Enter CleanSlate</span>
+              <span>Enter TITAN</span>
             </motion.button>
           </div>
         </header>
@@ -1085,7 +1067,7 @@ export const LandingPage: React.FC = () => {
               PLATFORM ARCHITECTURE
             </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight text-white uppercase">
-              THE CLEANSLATE CLEANING ENGINE
+              THE TITAN CLEANING ENGINE
             </h2>
             <p className="text-neutral-400 text-sm md:text-base max-w-2xl leading-relaxed">
               An autonomous, test-driven data cleaning layer that profiles, repairs, and validates every dataset with 100% reversibility and full information loss tracking.
@@ -1289,7 +1271,7 @@ export const LandingPage: React.FC = () => {
             className="pt-8 border-t border-neutral-900 text-center sm:text-left cursor-default"
           >
             <p className="text-base sm:text-lg text-white font-medium tracking-tight">
-              CleanSlate — One autonomous agent to clean, validate, and repair any enterprise dataset.
+              TITAN — One autonomous agent to clean, validate, and repair any enterprise dataset.
             </p>
           </motion.div>
         </div>
@@ -1371,159 +1353,8 @@ export const LandingPage: React.FC = () => {
             <div className="space-y-3">
               <h4 className="text-lg font-medium text-white uppercase">Information Loss Transparency</h4>
               <p className="text-sm text-neutral-400 leading-relaxed">
-                Before any cleaning step executes, CleanSlate predicts exact row impact, entropy change, and semantic coverage loss — so you decide what to clean with full visibility.
+                Before any cleaning step executes, TITAN predicts exact row impact, entropy change, and semantic coverage loss — so you decide what to clean with full visibility.
               </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================= */}
-      {/* SECTION 4: DEVELOPER & ENTERPRISE SUPPORT                  */}
-      {/* ========================================================= */}
-      <section id="support" className="relative w-full bg-black py-28 px-6 md:px-12 border-t border-neutral-900 overflow-hidden">
-        <div className="max-w-6xl mx-auto space-y-16 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="space-y-3 text-left"
-          >
-            <span className="text-xs font-semibold uppercase tracking-widest text-neutral-400 font-mono">
-              DEVELOPER & ENTERPRISE SUPPORT
-            </span>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight text-white uppercase">
-              START CLEANING WITH CLEANSLATE
-            </h2>
-            <p className="text-neutral-400 text-sm md:text-base max-w-2xl leading-relaxed">
-              Integrate CleanSlate in minutes with native Python SDK, comprehensive REST APIs, and enterprise-grade cleaning automation.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Interactive Code Playground */}
-            <div className="card-flow-bg lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-neutral-950 border border-neutral-800/90 flex flex-col justify-between space-y-6 hover:border-neutral-600 transition-colors">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCodeLanguage('typescript')}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                        codeLanguage === 'typescript' ? 'bg-white text-black' : 'text-neutral-400 hover:text-white bg-neutral-900'
-                      }`}
-                    >
-                      TypeScript
-                    </button>
-                    <button
-                      onClick={() => setCodeLanguage('python')}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                        codeLanguage === 'python' ? 'bg-white text-black' : 'text-neutral-400 hover:text-white bg-neutral-900'
-                      }`}
-                    >
-                      Python
-                    </button>
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleCopyCode(
-                        codeLanguage === 'typescript' ? 'npm i @cleanslate/sdk' : 'pip install cleanslate'
-                      )
-                    }
-                    className="text-xs font-mono text-neutral-400 hover:text-white bg-neutral-900 px-3 py-1 rounded-full border border-neutral-800 transition-colors cursor-pointer hover:border-neutral-600 flex items-center gap-1.5"
-                  >
-                    {copiedCode ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedCode ? 'Copied!' : codeLanguage === 'typescript' ? 'npm i @cleanslate/sdk' : 'pip install cleanslate'}</span>
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800 font-mono text-xs text-neutral-300">
-                  <pre className="overflow-x-auto text-[11px] leading-relaxed text-neutral-200">
-                    {codeLanguage === 'typescript'
-                      ? `import { CleanSlate } from '@cleanslate/sdk';
-
-const cs = new CleanSlate({
-  apiUrl: 'http://localhost:8000',
-  token: process.env.CLEANSLATE_TOKEN,
-});
-
-// Profile, clean, and verify a messy dataset
-const dataset = await cs.upload('./enterprise_data.csv');
-const profile = await cs.profile(dataset.id);
-const plan = await cs.generatePlan(dataset.id);
-
-// Apply reversible cleaning with loss estimation
-const result = await cs.apply(plan.id);
-console.log(result.information_loss); // { rows_affected: 847 }`
-                      : `from cleanslate import CleanSlate
-import os
-
-cs = CleanSlate(
-    api_url="http://localhost:8000",
-    token=os.getenv("CLEANSLATE_TOKEN")
-)
-
-# Profile, clean, and verify a messy dataset
-dataset = cs.upload("enterprise_data.csv")
-profile = cs.profile(dataset.id)
-plan = cs.generate_plan(dataset.id)
-
-# Apply reversible cleaning with loss estimation
-result = cs.apply(plan.id)
-print(result.information_loss)  # {rows_affected: 847}`}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-neutral-400 pt-2 border-t border-neutral-900">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <span>Full reversibility & information loss tracking</span>
-                </span>
-                <span className="font-mono text-neutral-500">v1.0.0 (Latest)</span>
-              </div>
-            </div>
-
-            {/* Support and Direct Launch Panel */}
-            <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
-              <div className="p-6 rounded-3xl bg-neutral-950 border border-neutral-800/90 space-y-3 hover:border-neutral-600 transition-colors">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-white uppercase">Live Pipeline Monitoring</h4>
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400 uppercase tracking-wider bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/50">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Online
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-400 leading-relaxed">
-                  Real-time audit logs, system health monitoring, and cleaning pipeline status across all active datasets.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-3xl bg-neutral-950 border border-neutral-800/90 space-y-3 hover:border-neutral-600 transition-colors">
-                <h4 className="text-sm font-medium text-white uppercase">Adversarial Resilience Lab</h4>
-                <p className="text-xs text-neutral-400 leading-relaxed">
-                  Built-in adversarial corpus testing and mutation benchmarks to stress-test your cleaning pipeline against worst-case data quality scenarios.
-                </p>
-              </div>
-
-              <motion.div
-                whileHover={{ y: -6, scale: 1.02 }}
-                transition={{ type: 'spring', stiffness: 350, damping: 20 }}
-                className="p-6 rounded-3xl bg-white text-black space-y-3 shadow-xl"
-              >
-                <h4 className="text-sm font-medium text-black uppercase">Ready to get started?</h4>
-                <p className="text-xs text-neutral-700 leading-relaxed">
-                  Launch the CleanSlate autonomous cleaning engine and reversible ledger workspace right now.
-                </p>
-                <motion.button
-                  onClick={handleEnterWorkspace}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="w-full bg-black text-white text-xs font-semibold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-neutral-800 transition-colors cursor-pointer shadow-lg"
-                >
-                  <span>Launch Platform Workspace</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </motion.button>
-              </motion.div>
             </div>
           </div>
         </div>
@@ -1538,9 +1369,9 @@ print(result.information_loss)  # {rows_affected: 847}`}
             <div className="w-6 h-6 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white">
               <Shield className="w-3 h-3 fill-white stroke-black" />
             </div>
-            <span className="text-white font-medium tracking-tight">CleanSlate</span>
+            <span className="text-white font-medium tracking-tight">TITAN</span>
             <span className="text-[11px] text-neutral-600">
-              © {new Date().getFullYear()} CleanSlate. All rights reserved.
+              © {new Date().getFullYear()} TITAN. All rights reserved.
             </span>
           </div>
 
@@ -1553,9 +1384,6 @@ print(result.information_loss)  # {rows_affected: 847}`}
             </a>
             <a href="#company" className="hover:text-white transition-colors">
               company
-            </a>
-            <a href="#support" className="hover:text-white transition-colors">
-              support
             </a>
             <button onClick={handleEnterWorkspace} className="text-emerald-400 hover:text-emerald-300 transition-colors">
               workspace

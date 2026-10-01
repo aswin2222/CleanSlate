@@ -46,7 +46,7 @@ async def sse_event_generator(run_id: str) -> AsyncGenerator[str, None]:
         init_event = {
             "run_id": run_id,
             "stage": "connected",
-            "message": "Connected to CleanSlate pipeline event stream",
+            "message": "Connected to TITAN pipeline event stream",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         yield f"data: {json.dumps(init_event)}\n\n"

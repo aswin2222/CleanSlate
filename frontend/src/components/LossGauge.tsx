@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, ShieldCheck, AlertOctagon } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { AlertTriangle, ShieldCheck, AlertOctagon, TrendingDown } from 'lucide-react';
 
 interface LossGaugeProps {
   score: number; // 0 to 100
@@ -22,24 +23,24 @@ export const LossGauge: React.FC<LossGaugeProps> = ({
   const lossLabel = label || (normalizedScore < 15 ? 'LOW' : normalizedScore < 40 ? 'MEDIUM' : 'HIGH');
 
   let colorClasses = {
-    bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-    bar: 'bg-emerald-500',
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    bg: 'bg-neutral-950 border-neutral-800 text-cyan-400',
+    bar: 'from-cyan-400 to-sky-400',
+    badge: 'bg-cyan-950/80 text-cyan-300 border-cyan-800/50 shadow-[0_0_10px_rgba(56,189,248,0.2)]',
     icon: ShieldCheck,
   };
 
   if (lossLabel === 'MEDIUM') {
     colorClasses = {
-      bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-      bar: 'bg-amber-500',
-      badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      bg: 'bg-neutral-950 border-neutral-800 text-amber-400',
+      bar: 'from-amber-400 to-yellow-400',
+      badge: 'bg-amber-950/80 text-amber-300 border-amber-800/50',
       icon: AlertTriangle,
     };
   } else if (lossLabel === 'HIGH') {
     colorClasses = {
-      bg: 'bg-rose-500/10 border-rose-500/30 text-rose-400',
-      bar: 'bg-rose-500',
-      badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      bg: 'bg-neutral-950 border-neutral-800 text-red-400',
+      bar: 'from-red-400 to-rose-400',
+      badge: 'bg-red-950/80 text-red-300 border-red-800/50',
       icon: AlertOctagon,
     };
   }
@@ -48,10 +49,10 @@ export const LossGauge: React.FC<LossGaugeProps> = ({
 
   if (compact) {
     return (
-      <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-medium text-xs ${colorClasses.bg}`}>
+      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold backdrop-blur-md ${colorClasses.bg}`}>
         <Icon className="w-3.5 h-3.5" />
         <span>Loss: {normalizedScore}%</span>
-        <span className={`px-1 rounded text-[10px] uppercase font-bold border ${colorClasses.badge}`}>
+        <span className={`px-2 py-0.2 rounded-full text-[10px] uppercase font-mono font-bold border ${colorClasses.badge}`}>
           {lossLabel}
         </span>
       </div>
@@ -59,46 +60,50 @@ export const LossGauge: React.FC<LossGaugeProps> = ({
   }
 
   return (
-    <div className={`p-4 rounded-xl border ${colorClasses.bg} backdrop-blur-sm shadow-lg`}>
+    <div className={`p-6 rounded-3xl border ${colorClasses.bg} shadow-2xl relative overflow-hidden group font-sans`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Icon className="w-5 h-5" />
-          <span className="text-sm font-semibold tracking-wide text-slate-200">Predicted Information Loss</span>
+          <div className="w-7 h-7 rounded-full bg-neutral-900 flex items-center justify-center border border-neutral-800">
+            <Icon className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-white">Predicted Loss</span>
         </div>
-        <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${colorClasses.badge}`}>
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border tracking-wider uppercase ${colorClasses.badge}`}>
           {lossLabel} RISK
         </span>
       </div>
 
-      <div className="flex items-baseline gap-2 mb-2">
+      <div className="flex items-baseline gap-2 mb-3">
         <span className="text-3xl font-extrabold tracking-tight text-white font-mono">{normalizedScore}%</span>
-        <span className="text-xs text-slate-400">compound dry-run loss index</span>
+        <span className="text-xs text-neutral-400 font-normal">compound loss index</span>
       </div>
 
-      {/* Progress Bar with safe/caution/danger threshold indicators */}
-      <div className="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700/60 mb-4">
-        <div
-          className={`h-full transition-all duration-700 ease-out ${colorClasses.bar}`}
-          style={{ width: `${Math.max(4, normalizedScore)}%` }}
+      {/* Progress Bar with glowing threshold indicators */}
+      <div className="relative w-full h-2 bg-neutral-900 rounded-full overflow-hidden border border-neutral-800 mb-4">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.max(4, normalizedScore)}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className={`h-full rounded-full bg-gradient-to-r ${colorClasses.bar}`}
         />
         {/* Markers for thresholds */}
-        <div className="absolute top-0 bottom-0 left-[15%] w-0.5 bg-slate-600/60" title="Low/Medium Threshold (15%)" />
-        <div className="absolute top-0 bottom-0 left-[40%] w-0.5 bg-slate-600/60" title="Medium/High Threshold (40%)" />
+        <div className="absolute top-0 bottom-0 left-[15%] w-px bg-neutral-700" title="Low Threshold (15%)" />
+        <div className="absolute top-0 bottom-0 left-[40%] w-px bg-neutral-700" title="Medium Threshold (40%)" />
       </div>
 
       {/* Sub-component metrics */}
-      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700/40 text-xs">
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-neutral-800 text-xs font-mono">
         <div>
-          <div className="text-slate-400">Rows Removed</div>
-          <div className="font-mono font-semibold text-slate-200">{(rowsRemovedPct * 100).toFixed(1)}%</div>
+          <div className="text-neutral-500 text-[10px] uppercase font-bold">Rows Purged</div>
+          <div className="font-bold text-white text-sm mt-0.5">{(rowsRemovedPct * 100).toFixed(1)}%</div>
         </div>
         <div>
-          <div className="text-slate-400">Cells Modified</div>
-          <div className="font-mono font-semibold text-slate-200">{(cellsModifiedPct * 100).toFixed(1)}%</div>
+          <div className="text-neutral-500 text-[10px] uppercase font-bold">Mutations</div>
+          <div className="font-bold text-teal-400 text-sm mt-0.5">{(cellsModifiedPct * 100).toFixed(1)}%</div>
         </div>
         <div>
-          <div className="text-slate-400">Entropy Delta</div>
-          <div className="font-mono font-semibold text-slate-200">{(entropyLoss * 100).toFixed(1)}%</div>
+          <div className="text-neutral-500 text-[10px] uppercase font-bold">Entropy Δ</div>
+          <div className="font-bold text-white text-sm mt-0.5">{(entropyLoss || 0).toFixed(2)}</div>
         </div>
       </div>
     </div>

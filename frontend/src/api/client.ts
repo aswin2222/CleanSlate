@@ -1,15 +1,17 @@
 /** Frontend HTTP API client managing token authentication and requests. */
-const BASE_URL = '';
+const BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL as string) || '';
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem('cleanslate_token');
+  return localStorage.getItem('titan_token') || localStorage.getItem('cleanslate_token');
 }
 
 export function setAuthToken(token: string): void {
+  localStorage.setItem('titan_token', token);
   localStorage.setItem('cleanslate_token', token);
 }
 
 export function clearAuthToken(): void {
+  localStorage.removeItem('titan_token');
   localStorage.removeItem('cleanslate_token');
 }
 
@@ -60,3 +62,47 @@ export async function apiRequest<T = any>(
 
   return response.json();
 }
+
+export async function downloadFile(endpoint: string, fallbackFilename?: string): Promise<void> {
+  const token = getAuthToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorDetail = 'Download failed';
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.detail?.message || errJson.detail || JSON.stringify(errJson);
+    } catch {
+      errorDetail = await response.text();
+    }
+    throw new Error(errorDetail);
+  }
+
+  let filename = fallbackFilename || 'cleaned_dataset';
+  const disposition = response.headers.get('Content-Disposition');
+  if (disposition && disposition.includes('filename=')) {
+    const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+    if (match && match[1]) {
+      filename = match[1];
+    }
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+

@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.routes_admin import admin_router
 from app.api.routes_auth import auth_router
+from app.api.routes_automation import automation_router
 from app.api.routes_datasets import datasets_router
 from app.api.routes_runs import runs_router
 from app.config import settings
@@ -33,16 +34,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Create default admin user if absent
     db = SessionLocal()
     try:
-        admin_user = db.query(User).filter(User.email == "admin@cleanslate.local").first()
-        if not admin_user:
-            admin = User(
-                email="admin@cleanslate.local",
-                password_hash=hash_password("cleanslate123!"),
-                role="admin",
-            )
-            db.add(admin)
-            db.commit()
-            logger.info("Default admin user created: admin@cleanslate.local")
+        # Seed admin users (support both titan.local and cleanslate.local)
+        for email, pwd in [("admin@titan.local", "titan123!"), ("admin@cleanslate.local", "cleanslate123!")]:
+            if not db.query(User).filter(User.email == email).first():
+                db.add(User(email=email, password_hash=hash_password(pwd), role="admin"))
+                db.commit()
+                logger.info(f"Default admin user created: {email}")
     finally:
         db.close()
 
@@ -50,8 +47,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="CleanSlate API",
-    description="Autonomous, Safe, Reversible Data Cleaning Agent for Messy Enterprise Datasets",
+    title="TITAN API",
+    description="TITAN: Autonomous, Safe, Reversible Data Cleaning Agent for Messy Enterprise Datasets",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -62,10 +59,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS middleware
+# CORS middleware - supports localhost, Netlify preview & production domains
+_origins = settings.cors_origins
+_allow_all = "*" in _origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=[] if _allow_all else _origins,
+    allow_origin_regex=".*" if _allow_all else r"https://.*\.netlify\.app|http://localhost:.*|http://127\.0\.0\.1:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -105,6 +106,7 @@ api_router.include_router(datasets_router)
 api_router.include_router(runs_router)
 api_router.include_router(admin_router)
 api_router.include_router(health_router)
+api_router.include_router(automation_router)
 app.include_router(api_router)
 
 # Mount routers at root for direct calls and test compatibility
@@ -113,3 +115,4 @@ app.include_router(datasets_router)
 app.include_router(runs_router)
 app.include_router(admin_router)
 app.include_router(health_router)
+app.include_router(automation_router)

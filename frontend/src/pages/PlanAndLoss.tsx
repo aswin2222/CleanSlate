@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiRequest } from '../api/client';
 import { Dataset, PlanStep, DryRunResult, Run } from '../types';
 import { LossGauge } from '../components/LossGauge';
@@ -11,6 +12,12 @@ import {
   RotateCcw,
   Sparkles,
   ArrowRight,
+  ShieldCheck,
+  ChevronDown,
+  Layers,
+  Sliders,
+  Check,
+  Flame,
 } from 'lucide-react';
 
 interface PlanAndLossProps {
@@ -102,10 +109,69 @@ export const PlanAndLoss: React.FC<PlanAndLossProps> = ({ selectedDataset }) => 
     }
   };
 
-  const handleApproveStep = (stepId: string) => {
+  const [approvingStepId, setApprovingStepId] = useState<string | null>(null);
+
+  const handleApproveStep = async (stepId: string) => {
+    if (!activeRunId) return;
+    const currentStep = steps.find((s) => s.id === stepId);
+    if (!currentStep) return;
+    const newApproved = !currentStep.approved;
+
+    // Optimistic UI update
     setSteps((prev) =>
-      prev.map((s) => (s.id === stepId ? { ...s, approved: !s.approved } : s))
+      prev.map((s) => (s.id === stepId ? { ...s, approved: newApproved } : s))
     );
+
+    try {
+      setApprovingStepId(stepId);
+      setError(null);
+      await apiRequest(`/api/runs/${activeRunId}/plan/${stepId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ approved: newApproved }),
+      });
+    } catch (err: any) {
+      // Revert if API failed
+      setSteps((prev) =>
+        prev.map((s) => (s.id === stepId ? { ...s, approved: !newApproved } : s))
+      );
+      setError(err.message || 'Failed to update step approval');
+    } finally {
+      setApprovingStepId(null);
+    }
+  };
+
+  const handleApproveAllSteps = async () => {
+    if (!activeRunId) return;
+    const unapproved = steps.filter((s) => s.requires_approval && !s.approved);
+    if (unapproved.length === 0) return;
+
+    // Optimistic update
+    setSteps((prev) => prev.map((s) => ({ ...s, approved: true })));
+    setError(null);
+
+    try {
+      setApprovingStepId('all');
+      await apiRequest(`/api/runs/${activeRunId}/plan/approve-all`, {
+        method: 'POST',
+      });
+    } catch (err: any) {
+      try {
+        await Promise.all(
+          unapproved.map((s) =>
+            apiRequest(`/api/runs/${activeRunId}/plan/${s.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ approved: true }),
+            })
+          )
+        );
+      } catch (innerErr: any) {
+        setError(innerErr.message || err.message || 'Failed to approve all steps');
+        const data = await apiRequest<{ steps: PlanStep[] }>(`/api/runs/${activeRunId}/plan`);
+        setSteps(data.steps || []);
+      }
+    } finally {
+      setApprovingStepId(null);
+    }
   };
 
   const handleProceedToApply = () => {
@@ -115,10 +181,10 @@ export const PlanAndLoss: React.FC<PlanAndLossProps> = ({ selectedDataset }) => 
 
   if (!selectedDataset) {
     return (
-      <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-xl">
-        <GitPullRequest className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-        <h3 className="text-white font-semibold text-sm">No dataset selected</h3>
-        <p className="text-xs text-slate-400 mt-1">Please select or upload a dataset first</p>
+      <div className="p-16 text-center bg-neutral-950 border border-neutral-800 rounded-3xl">
+        <GitPullRequest className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+        <h3 className="text-white font-semibold text-base">No dataset selected</h3>
+        <p className="text-xs text-neutral-400 mt-1">Please select or upload a dataset first</p>
       </div>
     );
   }
@@ -126,53 +192,96 @@ export const PlanAndLoss: React.FC<PlanAndLossProps> = ({ selectedDataset }) => 
   const unapprovedCount = steps.filter((s) => s.requires_approval && !s.approved).length;
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            Cleaning Plan & Loss Estimation:{' '}
-            <span className="text-indigo-400 font-mono">{selectedDataset.filename}</span>
+    <div className="space-y-8 relative">
+      {/* Top Header Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-8 rounded-3xl bg-neutral-950 border border-neutral-800/90 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden"
+      >
+        <div className="pointer-events-none absolute -right-10 -bottom-10 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl" />
+
+        <div className="space-y-2 z-10">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-[10px] font-mono font-medium uppercase tracking-wider bg-white/5 text-neutral-300 border border-white/10">
+              Deterministic Planner
+            </span>
+            {activeRunId && (
+              <span className="font-mono text-xs text-neutral-400 bg-neutral-900 px-2.5 py-0.5 rounded-full border border-neutral-800">
+                Run #{activeRunId.slice(0, 8)}
+              </span>
+            )}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight uppercase">
+            Cleaning Plan & Information Loss Model
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Calculates dry-run entropy drift, rows dropped, and cells modified before mutating any state.
+          <p className="text-xs text-neutral-400 leading-relaxed max-w-xl">
+            Simulates entropy drift, dropped records, and cell mutations without altering original disk state.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
+        {/* Action Buttons Toolbar */}
+        <div className="flex items-center gap-3 flex-wrap z-10">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleGeneratePlan}
             disabled={planning}
-            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
+            className="px-5 py-2.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${planning ? 'animate-spin' : ''}`} />
-            {planning ? 'Synthesizing...' : 'Re-Generate Plan'}
-          </button>
+            <Sparkles className={`w-3.5 h-3.5 ${planning ? 'animate-spin text-white' : 'text-white'}`} />
+            <span>{planning ? 'Synthesizing Plan...' : 'Re-Generate Plan'}</span>
+          </motion.button>
+
+          {unapprovedCount > 0 && (
+            <motion.button
+              whileHover={{ scale: 1.03, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleApproveAllSteps}
+              disabled={approvingStepId === 'all'}
+              className="px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4 text-black" />
+              <span>{approvingStepId === 'all' ? 'Approving All...' : `Approve All (${unapprovedCount})`}</span>
+            </motion.button>
+          )}
 
           {steps.length > 0 && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03, y: -1 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleProceedToApply}
               disabled={unapprovedCount > 0}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+              className="px-6 py-2.5 rounded-full bg-white text-black font-semibold text-xs flex items-center gap-2 hover:bg-neutral-200 shadow-md shadow-white/5 transition-all cursor-pointer disabled:opacity-40"
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-3.5 h-3.5 fill-black" />
               <span>Apply Reversible Plan</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            </motion.button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-          {error}
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center gap-2.5"
+        >
+          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+          <span>{error}</span>
+        </motion.div>
       )}
 
       {/* Cumulative Information Loss Banner */}
       {cumulativeLoss && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <div className="lg:col-span-1">
             <LossGauge
               score={cumulativeLoss.loss_score}
               label={cumulativeLoss.loss_label}
@@ -181,134 +290,234 @@ export const PlanAndLoss: React.FC<PlanAndLossProps> = ({ selectedDataset }) => 
             />
           </div>
 
-          <div className="md:col-span-2 p-5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+          <div className="lg:col-span-2 p-6 rounded-3xl bg-neutral-950 border border-neutral-800/90 flex flex-col justify-between shadow-2xl relative overflow-hidden">
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Dry-Run Information Loss Assessment
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-white" />
+                  Dry-Run Information Loss Assessment
+                </span>
+                <span className="text-xs font-mono text-neutral-300 font-medium bg-neutral-900 px-3 py-0.5 rounded-full border border-neutral-800">
+                  Pre-Flight Simulation
+                </span>
               </div>
-              <p className="text-sm text-slate-200 font-medium">
+              <p className="text-sm text-neutral-200 font-medium leading-relaxed mt-2">
                 {cumulativeLoss.human_summary}
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-800 text-xs font-mono">
-              <div className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
-                <div className="text-slate-400 text-[10px]">Rows Purged</div>
-                <div className="text-base font-bold text-white">
+            <div className="grid grid-cols-3 gap-3.5 pt-5 border-t border-neutral-800/80 text-xs font-mono mt-4">
+              <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+                <div className="text-neutral-400 text-[10px] uppercase font-bold">Rows Purged</div>
+                <div className="text-xl font-extrabold text-white mt-0.5">
                   {cumulativeLoss.rows_removed}{' '}
-                  <span className="text-slate-500 text-xs">
+                  <span className="text-neutral-500 text-xs font-normal">
                     ({(cumulativeLoss.rows_removed_pct * 100).toFixed(1)}%)
                   </span>
                 </div>
               </div>
-              <div className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
-                <div className="text-slate-400 text-[10px]">Cells Mutated</div>
-                <div className="text-base font-bold text-cyan-400">
+              <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+                <div className="text-neutral-400 text-[10px] uppercase font-bold">Cells Mutated</div>
+                <div className="text-xl font-extrabold text-white mt-0.5">
                   {cumulativeLoss.cells_modified}{' '}
-                  <span className="text-slate-500 text-xs">
+                  <span className="text-neutral-500 text-xs font-normal">
                     ({(cumulativeLoss.cells_modified_pct * 100).toFixed(1)}%)
                   </span>
                 </div>
               </div>
-              <div className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
-                <div className="text-slate-400 text-[10px]">Non-Null Destroyed</div>
-                <div className="text-base font-bold text-amber-400">
+              <div className="bg-neutral-900/80 p-3.5 rounded-2xl border border-neutral-800">
+                <div className="text-neutral-400 text-[10px] uppercase font-bold">Non-Null Destroyed</div>
+                <div className="text-xl font-extrabold text-white mt-0.5">
                   {cumulativeLoss.non_null_cells_destroyed}
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Plan Steps List */}
-      <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <GitPullRequest className="w-4 h-4 text-indigo-400" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-white">
-              Ordered Transformation Pipeline ({steps.length} Steps)
-            </h2>
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
+        className="rounded-3xl bg-neutral-950 border border-neutral-800/90 overflow-hidden shadow-2xl"
+      >
+        <div className="px-6 py-5 border-b border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-900/60">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white">
+              <GitPullRequest className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
+                Ordered Transformation Pipeline ({steps.length} Steps)
+              </h2>
+              <p className="text-xs text-neutral-400 font-sans">
+                Strict sequential execution with reversible deltas
+              </p>
+            </div>
           </div>
-          {unapprovedCount > 0 && (
-            <span className="text-xs text-amber-400 font-semibold flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" /> {unapprovedCount} step(s) require manual approval
+
+          {unapprovedCount > 0 ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-xs text-amber-300 font-medium flex items-center gap-1.5 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/30">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>{unapprovedCount} step(s) require manual approval</span>
+              </span>
+              <button
+                onClick={handleApproveAllSteps}
+                disabled={approvingStepId === 'all'}
+                className="px-4 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{approvingStepId === 'all' ? 'Approving All...' : `Approve All (${unapprovedCount})`}</span>
+              </button>
+            </div>
+          ) : steps.length > 0 ? (
+            <span className="text-xs text-neutral-300 font-medium flex items-center gap-1.5 bg-neutral-900 px-3 py-1.5 rounded-full border border-neutral-800">
+              <CheckCircle2 className="w-4 h-4 text-white" />
+              <span>All steps approved & ready to execute</span>
             </span>
-          )}
+          ) : null}
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-400 text-xs">Loading plan steps...</div>
+          <div className="p-16 text-center text-neutral-400 text-xs flex flex-col items-center gap-3">
+            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <span>Loading plan steps...</span>
+          </div>
         ) : steps.length === 0 ? (
-          <div className="p-12 text-center">
-            <RotateCcw className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-300 font-medium">No cleaning plan generated yet</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Click &quot;Re-Generate Plan&quot; to synthesize a verified transformation pipeline
+          <div className="p-16 text-center">
+            <RotateCcw className="w-10 h-10 text-neutral-600 mx-auto mb-2" />
+            <p className="text-sm text-neutral-300 font-semibold">No cleaning plan generated yet</p>
+            <p className="text-xs text-neutral-500 mt-1">
+              Click &quot;Re-Generate Plan&quot; to synthesize a verified transformation pipeline.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60">
-            {steps.map((step) => (
-              <div
-                key={step.id}
-                className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
-                  step.requires_approval && !step.approved ? 'bg-amber-950/20' : 'hover:bg-slate-800/20'
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold font-mono text-sm shrink-0">
-                    {step.seq}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-white text-sm font-mono">
-                        {step.transformation}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                          step.loss_label === 'HIGH'
-                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                            : step.loss_label === 'MEDIUM'
-                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        }`}
-                      >
-                        Loss: {(step.loss_score || 0).toFixed(1)}% ({step.loss_label || 'LOW'})
-                      </span>
-                      {step.requires_approval && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                          REQUIRES APPROVAL
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-300 mt-1">{step.rationale}</p>
-                    <div className="text-[11px] text-slate-500 font-mono mt-1">
-                      params: {JSON.stringify(step.params)}
-                    </div>
-                  </div>
-                </div>
+          <div className="divide-y divide-neutral-850">
+            {steps.map((step, idx) => {
+              const isPendingApproval = step.requires_approval && !step.approved;
+              const isApprovingThis = approvingStepId === step.id;
 
-                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
-                  {step.requires_approval && (
-                    <button
-                      onClick={() => handleApproveStep(step.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all ${
-                        step.approved
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+              return (
+                <motion.div
+                  key={step.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.04 }}
+                  className={`p-6 flex flex-col md:flex-row md:items-start justify-between gap-5 transition-all duration-200 relative overflow-hidden ${
+                    isPendingApproval
+                      ? 'bg-amber-950/15 border-l-4 border-l-amber-400'
+                      : 'hover:bg-neutral-900/40 border-l-4 border-l-neutral-700'
+                  }`}
+                >
+                  {/* Left Column: Sequence and Details */}
+                  <div className="flex items-start gap-4 min-w-0 flex-1 overflow-hidden">
+                    <div
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold font-mono text-sm shrink-0 border ${
+                        isPendingApproval
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-neutral-900 text-white border-neutral-800'
                       }`}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {step.approved ? 'Approved' : 'Approve Step'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                      {step.seq}
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-semibold text-white text-sm font-mono tracking-tight">
+                          {step.transformation}
+                        </span>
+                        <span
+                          className={`px-3 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase border tracking-wider ${
+                            step.loss_label === 'HIGH'
+                              ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                              : step.loss_label === 'MEDIUM'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              : 'bg-neutral-900 text-white border-neutral-800'
+                          }`}
+                        >
+                          Loss: {(step.loss_score || 0).toFixed(1)}% ({step.loss_label || 'LOW'})
+                        </span>
+                        {step.requires_approval && (
+                          <span
+                            className={`px-3 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase border flex items-center gap-1.5 ${
+                              step.approved
+                                ? 'bg-white/10 text-white border-white/20'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                step.approved ? 'bg-white' : 'bg-amber-400'
+                              }`}
+                            />
+                            {step.approved ? 'APPROVED' : 'REQUIRES APPROVAL'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-neutral-300 mt-2 leading-relaxed font-normal">{step.rationale}</p>
+
+                      {step.params && Object.keys(step.params).length > 0 && (
+                        <div className="text-[11px] font-mono mt-3 bg-neutral-900/90 p-3 rounded-2xl border border-neutral-800 max-w-full overflow-x-auto flex items-center gap-2 flex-wrap">
+                          <span className="text-neutral-500 font-semibold select-none flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                            <Sliders className="w-3 h-3 text-neutral-400" />
+                            params:
+                          </span>
+                          {Object.entries(step.params).map(([k, v]) => (
+                            <span
+                              key={k}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px]"
+                            >
+                              <span className="text-neutral-400">{k}:</span>
+                              <span className="text-white font-bold">{JSON.stringify(v)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Approve Action Button */}
+                  <div className="shrink-0 flex items-center gap-2 self-start md:self-center pt-2 md:pt-0">
+                    {step.requires_approval ? (
+                      <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => handleApproveStep(step.id)}
+                        disabled={isApprovingThis}
+                        className={`px-5 py-2.5 rounded-full text-xs font-semibold border flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
+                          step.approved
+                            ? 'bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-700'
+                            : 'bg-amber-400 hover:bg-amber-300 text-black border-amber-400 font-bold shadow-amber-400/20'
+                        }`}
+                      >
+                        <CheckCircle2
+                          className={`w-4 h-4 ${
+                            isApprovingThis ? 'animate-spin' : step.approved ? 'text-white' : 'text-black'
+                          }`}
+                        />
+                        <span>
+                          {isApprovingThis
+                            ? 'Updating...'
+                            : step.approved
+                            ? 'Approved ✓ (Revoke)'
+                            : 'Approve Step'}
+                        </span>
+                      </motion.button>
+                    ) : (
+                      <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-medium text-neutral-300 bg-neutral-900 border border-neutral-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        <span>Auto-Approved</span>
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };

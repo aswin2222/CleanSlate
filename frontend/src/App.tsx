@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { motion, useSpring, useMotionValue } from 'framer-motion';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { getAuthToken, apiRequest } from './api/client';
@@ -32,6 +33,44 @@ const ProtectedLayout: React.FC<{
   const location = useLocation();
   const token = getAuthToken();
 
+  // Mouse tracking for dynamic cursor glow and ambient spotlight (same as Landing Page)
+  const mouseX = useMotionValue(-100);
+  const mouseY = useMotionValue(-100);
+  const springConfig = { damping: 24, stiffness: 220, mass: 0.6 };
+  const smoothX = useSpring(mouseX, springConfig);
+  const smoothY = useSpring(mouseY, springConfig);
+  const [rawMouse, setRawMouse] = useState({ x: -100, y: -100 });
+  const [isHoveringInteractive, setIsHoveringInteractive] = useState(false);
+  const [isMouseInWindow, setIsMouseInWindow] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setIsMouseInWindow(true);
+      setRawMouse({ x: e.clientX, y: e.clientY });
+      mouseX.set(e.clientX);
+      mouseY.set(e.clientY);
+
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const interactive = target.closest('a, button, input, select, [role="button"], tr');
+        setIsHoveringInteractive(!!interactive);
+      }
+    };
+
+    const handleMouseLeave = () => setIsMouseInWindow(false);
+    const handleMouseEnter = () => setIsMouseInWindow(true);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    document.documentElement.addEventListener('mouseleave', handleMouseLeave);
+    document.documentElement.addEventListener('mouseenter', handleMouseEnter);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      document.documentElement.removeEventListener('mouseleave', handleMouseLeave);
+      document.documentElement.removeEventListener('mouseenter', handleMouseEnter);
+    };
+  }, [mouseX, mouseY]);
+
   if (!token) {
     return <Navigate to="/login" replace />;
   }
@@ -39,41 +78,68 @@ const ProtectedLayout: React.FC<{
   const getPageTitle = (pathname: string): string => {
     switch (pathname) {
       case '/dashboard':
-        return 'Enterprise Dashboard';
+        return 'Dashboard';
       case '/upload':
-        return 'Dataset Ingestion & Upload Guard';
+        return 'Ingestion & Upload';
       case '/profile':
-        return 'Deterministic Chunked Profiler';
+        return 'Dataset Profiler';
       case '/rules':
-        return 'Semantic Constraint Inference';
+        return 'Quality Rules';
       case '/plan':
-        return 'Plan & Information Loss Model';
+        return 'Cleaning Plan';
       case '/apply':
-        return 'Reversible Execution Ledger';
+        return 'Reversible Ledger';
       case '/verify':
-        return 'Pandera & Mutation Verification';
+        return 'Verification Suite';
       case '/adversarial':
-        return 'Adversarial Resilience Lab';
+        return 'Adversarial Lab';
       case '/benchmarks':
-        return 'Benchmarks & Scaling Evaluation';
+        return 'Benchmarks';
       case '/audit':
-        return 'Audit Logs & System Health';
+        return 'Audit & Health';
       default:
-        return 'CleanSlate Workspace';
+        return 'Workspace';
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+    <div className="relative flex h-screen w-full bg-black text-neutral-100 overflow-hidden font-sans selection:bg-neutral-800 selection:text-white">
+      {/* Interactive Cursor Spotlight (same as Landing Page) */}
+      {isMouseInWindow && (
+        <motion.div
+          className="pointer-events-none fixed top-0 left-0 z-50 rounded-full bg-radial from-emerald-400/12 via-white/5 to-transparent blur-xl hidden md:block"
+          style={{ x: smoothX, y: smoothY, translateX: '-50%', translateY: '-50%' }}
+          animate={{
+            width: isHoveringInteractive ? 140 : 80,
+            height: isHoveringInteractive ? 140 : 80,
+            opacity: isMouseInWindow ? 1 : 0,
+          }}
+          transition={{ type: 'spring', stiffness: 180, damping: 22 }}
+        />
+      )}
+
+      {/* Dynamic Mouse Background Spotlight (same as Landing Page) */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300 opacity-60 hidden md:block"
+        style={{
+          background: `radial-gradient(650px circle at ${rawMouse.x}px ${rawMouse.y}px, rgba(255, 255, 255, 0.035), transparent 70%)`,
+        }}
+      />
+
+      {/* Ambient background glow orbs */}
+      <div className="pointer-events-none fixed -top-32 -left-32 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl z-0" />
+      <div className="pointer-events-none fixed -bottom-32 right-12 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl z-0" />
+
       <Sidebar currentDatasetId={selectedDataset?.id} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         <Header
           title={getPageTitle(location.pathname)}
           datasets={datasets}
           selectedDataset={selectedDataset}
           onSelectDataset={onSelectDataset}
         />
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 relative">{children}</main>
       </div>
     </div>
   );

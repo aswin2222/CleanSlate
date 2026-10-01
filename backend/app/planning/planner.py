@@ -17,6 +17,7 @@ from app.transforms.base import PlanStep
 TRANSFORMATION_EXECUTION_ORDER = [
     "normalize_missing_markers",
     "trim_whitespace",
+    "remove_json_brackets",
     "normalize_case",
     "parse_numeric",
     "standardize_dates",
@@ -68,6 +69,20 @@ class TransformationPlanner:
             t = registry.get("trim_whitespace")
             if t:
                 step = t.plan(df, {"columns": ws_cols})
+                if step.predicted_loss.cells_modified > 0:
+                    proposed_steps.append(step)
+
+        # 2b. Remove JSON brackets and unnest embedded JSON
+        json_cols = []
+        for c in data_cols:
+            if c in df.columns:
+                has_json = any("{" in str(v) and "}" in str(v) for v in df[c].dropna().head(100))
+                if has_json:
+                    json_cols.append(c)
+        if json_cols:
+            t = registry.get("remove_json_brackets")
+            if t:
+                step = t.plan(df, {"columns": json_cols})
                 if step.predicted_loss.cells_modified > 0:
                     proposed_steps.append(step)
 

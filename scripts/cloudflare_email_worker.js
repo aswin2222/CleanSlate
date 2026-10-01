@@ -1,70 +1,93 @@
 /**
- * Cloudflare Email Routing Worker for TITAN Autonomous Data Cleaner
+ * Cloudflare Email Routing Worker for TITAN Autonomous Data Engine
  * 
- * Instructions:
- * 1. Go to Cloudflare Dashboard -> Workers & Pages -> Create Application -> Create Worker
- * 2. Paste this code into your Worker editor and Deploy.
- * 3. Go to your Domain -> Email -> Email Routing -> Routing Rules.
- * 4. Add a Custom Address:
- *    - Example: clean@yourdomain.com
- *    - Action: "Send to a Worker"
- *    - Select: this Worker
- * 5. Set Environment Variable in Worker Settings:
- *    - TITAN_WEBHOOK_URL: "https://<your-tunnel-or-domain>/api/automation/email-webhook"
- *    - DESTINATION_EMAIL: "recipient@example.com" (where cleaned data should be sent)
+ * Flow:
+ * 1. An incoming email is received at your Cloudflare domain (e.g., clean@yourdomain.com).
+ * 2. This worker intercepts the email, parses the headers, subject, body, and attachment.
+ * 3. It checks for the trigger phrase "clean data" (case-insensitive in subject or body).
+ * 4. It extracts the dataset attachment and converts it to base64.
+ * 5. It dispatches a webhook to TITAN (https://titancoho.netlify.app/api/automation/email-webhook).
+ * 6. TITAN's headless cleaning engine autonomously standardizes the data and emails the
+ *    cleaned file + interactive audit report back to the sender via Resend API.
  */
 
 import PostalMime from 'postal-mime';
 
+// Utility to convert ArrayBuffer/Uint8Array to Base64 in Cloudflare Worker runtime
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  const chunkSize = 8192;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
 export default {
   async email(message, env, ctx) {
+    const sender = message.from;
+    const recipient = env.DESTINATION_EMAIL || sender;
+    const webhookUrl = env.TITAN_WEBHOOK_URL || 'https://titancoho.netlify.app/api/automation/email-webhook';
+
+    console.log(`[TITAN] Inbound email from '${sender}' to '${message.to}'`);
+
+    // 1. Read raw email stream
     const rawEmail = await new Response(message.raw).arrayBuffer();
     const parser = new PostalMime();
     const parsedEmail = await parser.parse(rawEmail);
 
     const subject = parsedEmail.subject || '';
     const textBody = parsedEmail.text || parsedEmail.html || '';
-    const sender = message.from;
-    const recipient = env.DESTINATION_EMAIL || message.to;
-    const webhookUrl = env.TITAN_WEBHOOK_URL || 'https://YOUR_TUNNEL_URL/api/automation/email-webhook';
 
-    // 1. Check for trigger phrase
+    // 2. Validate trigger phrase
     const combinedContent = `${subject} ${textBody}`.toLowerCase();
     if (!combinedContent.includes('clean data')) {
       console.log(`[TITAN] Ignored email from ${sender}: missing trigger phrase 'clean data'.`);
       return;
     }
 
-    // 2. Extract attachment
+    // 3. Validate attachments
     if (!parsedEmail.attachments || parsedEmail.attachments.length === 0) {
-      console.log(`[TITAN] No attachment found in email from ${sender}.`);
+      console.log(`[TITAN] Warning: 'clean data' found, but no attachment was attached by ${sender}.`);
       return;
     }
 
     const attachment = parsedEmail.attachments[0];
-    console.log(`[TITAN] Processing attachment: ${attachment.filename} (${attachment.content.byteLength} bytes)`);
+    const filename = attachment.filename || 'dataset.csv';
+    console.log(`[TITAN] Extracted attachment '${filename}' (${attachment.content.byteLength} bytes)`);
 
-    // 3. Prepare Multipart Form Data to forward to TITAN Backend
-    const formData = new FormData();
-    formData.append('subject', subject);
-    formData.append('text', textBody);
-    formData.append('from', sender);
-    formData.append('destination_email', recipient);
+    // 4. Encode attachment to Base64
+    const base64Content = arrayBufferToBase64(attachment.content);
 
-    const blob = new Blob([attachment.content], { type: attachment.mimeType || 'application/octet-stream' });
-    formData.append('file', blob, attachment.filename || 'dataset.csv');
+    // 5. Construct payload for TITAN webhook
+    const payload = {
+      subject: subject,
+      text: textBody,
+      from: sender,
+      destination_email: recipient,
+      filename: filename,
+      file_base64: base64Content,
+    };
 
-    // 4. Dispatch to TITAN Backend
+    // 6. Post to TITAN Backend Webhook
     try {
+      console.log(`[TITAN] Forwarding to webhook: ${webhookUrl}`);
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'TITAN-Cloudflare-Email-Worker/1.0',
+        },
+        body: JSON.stringify(payload),
       });
 
-      const result = await response.text();
-      console.log(`[TITAN] Webhook response (${response.status}):`, result);
+      const responseText = await response.text();
+      console.log(`[TITAN] Webhook responded (${response.status}):`, responseText);
     } catch (err) {
-      console.error('[TITAN] Failed to forward email to TITAN webhook:', err);
+      console.error(`[TITAN] Failed to forward email to TITAN webhook:`, err);
     }
   },
 };

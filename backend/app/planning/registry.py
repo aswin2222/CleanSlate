@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Type
 from app.transforms.base import Transformation
 from app.transforms.missing import NormalizeMissingMarkers
-from app.transforms.text import TrimWhitespace, NormalizeCase, NormalizePhone
+from app.transforms.text import TrimWhitespace, NormalizeCase, NormalizePhone, RemoveJsonBrackets
 from app.transforms.dates import StandardizeDates
 from app.transforms.numeric import ParseNumeric
 from app.transforms.dedupe import DedupeExact, DedupeFuzzy
@@ -39,9 +39,10 @@ class TransformationRegistry:
         return list(self._registry.keys())
 
     def _register_defaults(self) -> None:
-        # All 14 mandatory transformations
+        # All allowlisted transformations
         self.register(NormalizeMissingMarkers())
         self.register(TrimWhitespace())
+        self.register(RemoveJsonBrackets())
         self.register(NormalizeCase())
         self.register(StandardizeDates())
         self.register(ParseNumeric())

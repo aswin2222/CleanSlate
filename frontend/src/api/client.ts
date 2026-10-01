@@ -1,5 +1,11 @@
 /** Frontend HTTP API client managing token authentication and requests. */
-const BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL as string) || '';
+const rawBaseUrl = ((import.meta as any).env?.VITE_API_BASE_URL as string) || '';
+export const BASE_URL = rawBaseUrl.replace(/\/+$/, '');
+
+export function getApiUrl(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return BASE_URL ? `${BASE_URL}${cleanEndpoint}` : cleanEndpoint;
+}
 
 export function getAuthToken(): string | null {
   return localStorage.getItem('titan_token') || localStorage.getItem('cleanslate_token');
@@ -30,7 +36,8 @@ export async function apiRequest<T = any>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
+  const url = getApiUrl(endpoint);
+  const response = await fetch(url, {
     ...options,
     headers,
   });
@@ -70,7 +77,8 @@ export async function downloadFile(endpoint: string, fallbackFilename?: string):
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
+  const url = getApiUrl(endpoint);
+  const response = await fetch(url, {
     method: 'GET',
     headers,
   });

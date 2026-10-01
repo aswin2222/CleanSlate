@@ -13,7 +13,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: ALLOWED_ORIGINS
-        value: "*"
+        value: "https://titancoho.netlify.app,http://localhost:5173,http://127.0.0.1:5173"
       - key: DATA_ENCRYPTION_KEY
         value: dGhpcy1pcy1hLTMyLWJ5dGUtZGV2LWtleS0xMjM0NTY3ODk=
       - key: JWT_SECRET_KEY

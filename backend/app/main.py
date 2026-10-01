@@ -1,12 +1,14 @@
 """CleanSlate FastAPI Application Entrypoint."""
 from __future__ import annotations
 
+import re
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI, Request, Response, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.types import ASGIApp, Receive, Scope, Send
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -59,17 +61,32 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+class NormalizePathMiddleware:
+    """Normalizes consecutive slashes (e.g. //api/auth/login) into single slashes."""
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            if "//" in path:
+                scope["path"] = re.sub(r"/+", "/", path)
+        await self.app(scope, receive, send)
+
+app.add_middleware(NormalizePathMiddleware)
+
 # CORS middleware - supports localhost, Netlify preview & production domains
 _origins = settings.cors_origins
 _allow_all = "*" in _origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[] if _allow_all else _origins,
-    allow_origin_regex=".*" if _allow_all else r"https://.*\.netlify\.app|http://localhost:.*|http://127\.0\.0\.1:.*",
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _origins,
+    allow_origin_regex=None if _allow_all else r"https://.*\.netlify\.app|http://localhost:.*|http://127\.0\.0\.1:.*",
+    allow_credentials=False if _allow_all else True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 

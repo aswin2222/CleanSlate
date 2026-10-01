@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Database, LogOut, FileText, Shield, ChevronDown } from 'lucide-react';
-import { clearAuthToken } from '../api/client';
+import { clearAuthToken, BASE_URL } from '../api/client';
 import { Dataset } from '../types';
 
 interface HeaderProps {
@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
         </Link>
 
         <button
-          onClick={() => window.open('http://127.0.0.1:8000/docs', '_blank')}
+          onClick={() => window.open(`${BASE_URL || 'http://127.0.0.1:8000'}/docs`, '_blank')}
           title="Open API Docs (Swagger)"
           className="p-1.5 px-2.5 rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-xs"
         >
